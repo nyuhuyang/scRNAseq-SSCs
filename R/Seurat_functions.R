@@ -1,5 +1,102 @@
-# combine FindAllMarkers and calculate average UMI
+#### For FeatureHeatmap() ####
+#https://github.com/satijalab/seurat/issues/235
+# Function to pseudo customize FeatureHeatmap
+#### For FeaturePlot() ####
+# Function to pseudo customize FeaturePlots
+customize_Seurat_FeaturePlot <- function(p, alpha.use = 1, gradient.use = c("yellow", "red"),
+                                         expression.threshold = 0, is.log1p.transformed = F) {
 
+        #### Main function ####
+        main_function <- function(p = p, alpha.use = alpha.use, gradient.use = gradient.use,
+                                  expression.threshold = expression.threshold,
+                                  is.log1p.transformed = is.log1p.transformed) {
+                
+                # Order data by gene expresion level
+                p$data <- p$data[order(p$data$gene),]
+                
+                # Define lower limit of gene expression level
+                if (isTRUE(is.log1p.transformed)) {
+                        expression.threshold <- expression.threshold
+                } else {
+                        expression.threshold <- log1p(expression.threshold)
+                }
+                
+                # Compute maximum value in gene expression
+                max.exp <- max(p$data$gene)
+                
+                # Fill points using the gene expression levels
+                p$layers[[1]]$mapping$fill <- p$layers[[1]]$mapping$colour
+                
+                # Define transparency of points
+                p$layers[[1]]$mapping$alpha <- alpha.use
+                
+                # Change fill and colour gradient values
+                p <- p + scale_colour_gradientn(colours = gradient.use, guide = F, 
+                                                limits = c(expression.threshold, max.exp),
+                                                na.value = "grey") +
+                        scale_fill_gradientn(colours = gradient.use,
+                                             name = expression(atop(Expression, (log))),
+                                             limits = c(expression.threshold, max.exp),
+                                             na.value = "grey") +
+                        scale_alpha_continuous(range = alpha.use, guide = F)
+        }
+        
+        #### Execution of main function ####
+        # Apply main function on all features
+        p <- lapply(X = p, alpha.use = alpha.use, gradient.use = gradient.use, 
+                    expression.threshold = expression.threshold,
+                    is.log1p.transformed = is.log1p.transformed,
+                    FUN = main_function)
+        
+        # Arrange all plots using cowplot
+        # Adapted from Seurat
+        # https://github.com/satijalab/seurat/blob/master/R/plotting.R#L1100
+        # ncol argument adapted from Josh O'Brien
+        # https://stackoverflow.com/questions/10706753/how-do-i-arrange-a-variable-list-of-plots-using-grid-arrange
+        cowplot::plot_grid(plotlist = p, ncol = ceiling(sqrt(length(p))))
+}
+
+#### For FeatureHeatmap() ####
+# Function to pseudo customize FeatureHeatmap
+customize_Seurat_FeatureHeatmap <- function(p, alpha.use = 1, 
+                                            gradient.use = c("yellow", "red"),
+                                            scaled.expression.threshold = NULL) {
+        
+        # Order data by scaled gene expresion level
+        p$data <- p$data[order(p$data$scaled.expression),]
+        
+        # Define lower limit of scaled gene expression level
+        if (!is.null(scaled.expression.threshold)) {
+                scaled.expression.threshold <- scaled.expression.threshold
+        } else if (is.null(scaled.expression.threshold)) {
+                scaled.expression.threshold <- min(p$data$scaled.expression)
+        }
+        
+        # Compute maximum value in gene expression
+        max.scaled.exp <- max(p$data$scaled.expression)
+        
+        # Fill points using the scaled gene expression levels
+        p$layers[[1]]$mapping$fill <- p$layers[[1]]$mapping$colour
+        
+        # Define transparency of points
+        p$layers[[1]]$mapping$alpha <- alpha.use
+        
+        # Change fill and colour gradient values
+        p <- p + scale_colour_gradientn(colours = gradient.use, guide = F,
+                                        limits = c(scaled.expression.threshold,
+                                                   max.scaled.exp), na.value = "grey") +
+                scale_fill_gradientn(colours = gradient.use,
+                                     name = expression(atop(Scaled, expression)),
+                                     limits = c(scaled.expression.threshold, max.scaled.exp),
+                                     na.value = "grey") +
+                scale_alpha_continuous(range = alpha.use, guide = F)
+        
+        # Return plot
+        p
+}
+
+
+# combine FindAllMarkers and calculate average UMI
 FindAllMarkers.UMI <- function (object, genes.use = NULL, logfc.threshold = 0.25, 
           test.use = "wilcox", min.pct = 0.1, min.diff.pct = -Inf, 
           print.bar = TRUE, only.pos = FALSE, max.cells.per.ident = Inf, 
@@ -242,46 +339,6 @@ FindMarkers.1 <- function (object, ident.1, ident.2 = NULL, genes.use = NULL,
         return(to.return)
 }
 
-# find and print differentially expressed genes within all major cell types ================
-# combine SubsetData, FindAllMarkers, write.csv parallely
-
-SplitFindAllMarkers <- function(object,split.by = "conditions", write.csv = TRUE){
-    "
-    split seurat object by certein criteria, and find all markers+ UMI +adj_p
-    
-    Inputs
-    -------------------
-    object: aligned seurat object with labels at object@meta.data$
-    split.by: the criteria to split
-    write.csv: TRUE/FASLE, write csv files or not.
-    
-    Outputs
-    --------------------
-    object.markers: list of gene markers
-    "
-    object.subsets <- SplitCells(object = object, split.by = split.by)
-    conditions <- object.subsets[[length(object.subsets)]] # levels of conditions
-    
-    object.markers <- list()
-
-    for(i in 1:length(conditions)){ 
-        object.markers[[i]] <- FindAllMarkers.UMI(object = object.subsets[[i]],
-                                         logfc.threshold = -Inf,
-                                         return.thresh = 1,
-                                         test.use = "bimod",
-                                         min.pct = -Inf,
-                                         min.diff.pct = -Inf,
-                                         min.cells = -Inf)
-        if(write.csv) write.csv(object.markers[[i]], 
-                                file=paste0("./output/",
-                                            deparse(substitute(object)), 
-                                            "_",conditions[i],
-                                            ".csv"))
-    }
-    return(object.markers)
-}
-
-
 # find and print differentially expressed genes across conditions ================
 # combine SetIdent,indMarkers and avg_UMI
 FindAllMarkersAcrossConditions<- function(object, genes.use = NULL, logfc.threshold = 0.25, 
@@ -357,8 +414,9 @@ FindAllMarkersAcrossConditions<- function(object, genes.use = NULL, logfc.thresh
         return(gde.all)
 }
 
+
 ##
-gg_colors <- function(object = mouse_eyes, return.vector=FALSE, cells.use = NULL,
+gg_colors <- function(object = object, return.vector=FALSE, cells.use = NULL,
                       no.legend = TRUE, do.label = TRUE,
                       do.return = TRUE, label.size = 6, gg_title="", ...){
         "
@@ -400,6 +458,26 @@ gg_colors <- function(object = mouse_eyes, return.vector=FALSE, cells.use = NULL
             print(colors)
             return(as.character(colors))
             }
+}
+
+# HumanGenes
+# turn list of gene character to uniform Human gene list format
+HumanGenes <- function(seurat.object, marker.genes, unique=FALSE){
+        if(missing(seurat.object)) 
+                stop("A seurat object must be provided first")
+        if(class(seurat.object) != "seurat") 
+                stop("A seurat object must be provided first")
+        if(missing(marker.genes)) 
+                stop("A list of marker genes must be provided")
+        # marker.genes =c("Cdh5,Pecam1,Flt1,Vwf,Plvap,Kdr") for example
+        marker.genes <- as.character(marker.genes)
+        marker.genes <- unlist(strsplit(marker.genes,","))
+        #        marker.genes <- unique(genes)
+        marker.genes <- toupper(marker.genes)
+        marker.genes <- marker.genes[marker.genes %in% seurat.object@raw.data@Dimnames[[1]]]
+        if(unique) marker.genes <- unique(marker.genes)
+        print(length(marker.genes))
+        return(marker.genes)
 }
 
 # modified GenePlot
@@ -485,24 +563,30 @@ LabelUL <- function(plot, genes, exp.mat, adj.u.t = 0.1, adj.l.t = 0.15, adj.u.s
                           adj.y.s = adj.u.s, adj.x.s = -adj.l.s, ...))
 }
 
-# HumanGenes
-# turn list of gene character to uniform Human gene list format
-HumanGenes <- function(seurat.object, marker.genes, unique=FALSE){
-        if(missing(seurat.object)) 
-                stop("A seurat object must be provided first")
-        if(class(seurat.object) != "seurat") 
-                stop("A seurat object must be provided first")
-        if(missing(marker.genes)) 
-                stop("A list of marker genes must be provided")
-        # marker.genes =c("Cdh5,Pecam1,Flt1,Vwf,Plvap,Kdr") for example
-        marker.genes <- as.character(marker.genes)
-        marker.genes <- unlist(strsplit(marker.genes,","))
-        #        marker.genes <- unique(genes)
-        marker.genes <- toupper(marker.genes)
-        marker.genes <- marker.genes[marker.genes %in% seurat.object@raw.data@Dimnames[[1]]]
-        if(unique) marker.genes <- unique(marker.genes)
-        print(length(marker.genes))
-        return(marker.genes)
+Marker2Type <- function(gene,Cell_Type){
+        "Convert N gene vector into a NX2 dataframe.
+        Input 
+        gene: N gene vector
+        Cell_Type: vector name
+        
+        Output 
+        df: N by 2 dataframe with gene at column1 and Cell_Type at column2.
+        ---------------------------"
+        df <- data.frame(gene = gene,stringsAsFactors = F)
+        df$Cell_Type <- Cell_Type
+        return(df)
+}
+Marker2Types <- function(x){
+        "Convert a list of N gene vector into a NX2 dataframe.
+        Input 
+        x: list of N gene vector
+        
+        Output 
+        df: N by 2 dataframe with gene at column1 and Cell_Type at column2.
+        ---------------------------"
+        y <- lapply(seq_along(x), function(y, n, i) { Marker2Type(y[[i]],n[[i]]) }, y=x, n=names(x))
+        df <- do.call(rbind.data.frame, y)
+        return(df)
 }
 
 # MouseGenes
@@ -609,14 +693,17 @@ SingleFeaturePlot.1 <- function (object = object, feature = feature, pt.size = 1
                 }
                 else {
                         p <- p + geom_point(mapping = aes(color = gene), 
-                                            size = pt.size, shape = pch.use) + scale_color_gradientn(colors = cols.use, 
-                                                                                                     guide = guide_colorbar(title = feature))
+                                            size = pt.size, shape = pch.use) +
+                                scale_color_gradientn(colors = cols.use,
+                                                      guide = guide_colorbar(title = feature))
                 }
         }
         if (no.axes) {
                 p <- p + labs(title = feature, x = "", y = "") + theme(axis.line = element_blank(), 
-                                                                       axis.text.x = element_blank(), axis.text.y = element_blank(), 
-                                                                       axis.ticks = element_blank(), axis.title.x = element_blank(), 
+                                                                       axis.text.x = element_blank(), 
+                                                                       axis.text.y = element_blank(), 
+                                                                       axis.ticks = element_blank(), 
+                                                                       axis.title.x = element_blank(), 
                                                                        axis.title.y = element_blank())
         }
         else {
@@ -631,7 +718,7 @@ SingleFeaturePlot.1 <- function (object = object, feature = feature, pt.size = 1
         return(p)
 }
 
-SplitCells <- function(object = mouse_eyes, split.by = "conditions"){
+SplitCells <- function(object = object, split.by = "conditions"){
     "
     split seurat object by certein criteria
     
@@ -649,9 +736,9 @@ SplitCells <- function(object = mouse_eyes, split.by = "conditions"){
 
     "
     cell.all <- FetchData(object,split.by)
-    conditions <- levels(cell.all[,1])
-    cell.subsets <- lapply(conditions, function(x) 
-        rownames(cell.all)[cell.all$conditions == x])
+    Levels <- levels(cell.all[,1])
+    cell.subsets <- lapply(Levels, function(x) 
+        rownames(cell.all)[cell.all[,split.by] == x])
     
     object.subsets <- list()
     for(i in 1:length(conditions)){
@@ -662,7 +749,7 @@ SplitCells <- function(object = mouse_eyes, split.by = "conditions"){
 }
 
 
-SplitTSNEPlot <- function(object = mouse_eyes, split.by = "conditions",
+SplitTSNEPlot <- function(object = object, split.by = "conditions",
                           select.plots = NULL, return.plots = FALSE,
                           do.label = T, group.by = "ident", no.legend = TRUE,
                           pt.size = 1,label.size = 5,... ){
@@ -698,6 +785,89 @@ SplitTSNEPlot <- function(object = mouse_eyes, split.by = "conditions",
     if(return.plots) return(p) else print(do.call(plot_grid, p))
 }
 
+
+# find and print differentially expressed genes within all major cell types ================
+# combine SubsetData, FindAllMarkers, write.csv parallely
+
+SplitFindAllMarkers <- function(object,split.by = "conditions", write.csv = TRUE){
+        "
+        split seurat object by certein criteria, and find all markers+ UMI +adj_p
+        
+        Inputs
+        -------------------
+        object: aligned seurat object with labels at object@meta.data$
+        split.by: the criteria to split
+        write.csv: TRUE/FASLE, write csv files or not.
+        
+        Outputs
+        --------------------
+        object.markers: list of gene markers
+        "
+    object.subsets <- SplitCells(object = object, split.by = split.by)
+    conditions <- object.subsets[[length(object.subsets)]] # levels of conditions
+    
+    object.markers <- list()
+
+    for(i in 1:length(conditions)){ 
+        object.markers[[i]] <- FindAllMarkers.UMI(object = object.subsets[[i]],
+                                         logfc.threshold = -Inf,
+                                         return.thresh = 1,
+                                         test.use = "bimod",
+                                         min.pct = -Inf,
+                                         min.diff.pct = -Inf,
+                                         min.cells = -Inf)
+        if(write.csv) write.csv(object.markers[[i]], 
+                                file=paste0("./output/",
+                                            deparse(substitute(object)), 
+                                            "_",conditions[i],
+                                            ".csv"))
+    }
+    return(object.markers)
+}
+
+
+# find and print differentially expressed genes within all major cell types ================
+# combine SubsetData, FindAllMarkers, write.csv parallely
+
+SplitFindAllMarkers <- function(object,split.by = "conditions", write.csv = TRUE){
+        "
+        split seurat object by certein criteria, and find all markers+ UMI +adj_p
+        
+        Inputs
+        -------------------
+        object: aligned seurat object with labels at object@meta.data$
+        split.by: the criteria to split
+        write.csv: TRUE/FASLE, write csv files or not.
+        
+        Outputs
+        --------------------
+        object.markers: list of gene markers
+        "
+        object.subsets <- SplitCells(object = object, split.by = split.by)
+        conditions <- object.subsets[[length(object.subsets)]] # levels of conditions
+        
+        object.markers <- list()
+        
+        for(i in 1:length(conditions)){ 
+                object.markers[[i]] <- FindAllMarkers.UMI(object = object.subsets[[i]],
+                                                          logfc.threshold = -Inf,
+                                                          return.thresh = 1,
+                                                          test.use = "bimod",
+                                                          min.pct = -Inf,
+                                                          min.diff.pct = -Inf,
+                                                          min.cells = -Inf)
+                if(write.csv) write.csv(object.markers[[i]], 
+                                        file=paste0("./output/",
+                                                    deparse(substitute(object)), 
+                                                    "_",conditions[i],
+                                                    ".csv"))
+        }
+        return(object.markers)
+}
+
+
+# find and print differentially expressed genes across conditions ================
+# combine SetIdent,indMarkers and avg_UMI
 
 TSNEPlot.3D <- function (object, reduction.use = "tsne", dim.1 = 1, dim.2 = 2, dim.3 = 3,
           cells.use = NULL, pt.size = 1, do.return = FALSE, do.bare = FALSE, 
@@ -775,8 +945,9 @@ TSNEPlot.3D <- function (object, reduction.use = "tsne", dim.1 = 1, dim.2 = 2, d
                 centers <- data.plot %>% dplyr::group_by(ident) %>% 
                         summarize(x = median(x = x), y = median(x = y))
                 p3 <- p3 + geom_point(data = centers, mapping = aes(x = x, 
-                                                                    y = y), size = 0, alpha = 0) + geom_text(data = centers, 
-                                                                                                             mapping = aes(label = ident), size = label.size)
+                                                                    y = y), size = 0, alpha = 0) + 
+                        geom_text(data = centers,
+                                  mapping = aes(label = ident), size = label.size)
         }
         if (dark.theme) {
                 p <- p + DarkTheme()
@@ -866,15 +1037,16 @@ SplitDotPlotGG.1 <- function (object, grouping.var, genes.plot,
         idents.new <- paste(object@ident, grouping.data, sep = "_")
         colorlist <- cols.use
         names(x = colorlist) <- levels(x = grouping.data)
-        object@ident <- factor(x = idents.new, levels = unlist(x = lapply(X = idents.old, 
-                                                                          FUN = function(x) {
-                                                                                  lvls <- list()
-                                                                                  for (i in seq_along(along.with = levels(x = grouping.data))) {
-                                                                                          lvls[[i]] <- paste(x, levels(x = grouping.data)[i], 
-                                                                                                             sep = "_")
-                                                                                  }
-                                                                                  return(unlist(x = lvls))
-                                                                          })), ordered = TRUE)
+        object@ident <- factor(x = idents.new, 
+                               levels = unlist(x = lapply(X = idents.old,
+                                                          FUN = function(x) {
+                                                          lvls <- list()
+                                                          for (i in seq_along(along.with = levels(x = grouping.data))) {
+                                                                  lvls[[i]] <- paste(x, levels(x = grouping.data)[i], 
+                                                                                     sep = "_")
+                                                          }
+                                                          return(unlist(x = lvls))
+                                                  })), ordered = TRUE)
         data.to.plot <- data.frame(FetchData(object = object, vars.all = genes.plot))
         data.to.plot$cell <- rownames(x = data.to.plot)
         data.to.plot$id <- object@ident
@@ -884,11 +1056,14 @@ SplitDotPlotGG.1 <- function (object, grouping.var, genes.plot,
                 summarize(avg.exp = ExpMean(x = expression), pct.exp = Seurat:::PercentAbove(x = expression, 
                                                                                     threshold = 0))
         data.to.plot <- data.to.plot %>% ungroup() %>% group_by(genes.plot) %>% 
-                mutate(avg.exp = scale(x = avg.exp)) %>% mutate(avg.exp.scale = as.numeric(x = cut(x = MinMax(data = avg.exp, 
-                                                                                                              max = col.max, min = col.min), breaks = 20)))
+                mutate(avg.exp = scale(x = avg.exp)) %>% 
+                mutate(avg.exp.scale = as.numeric(x = cut(x = MinMax(data = avg.exp,
+                                                                     max = col.max,
+                                                                     min = col.min),
+                                                          breaks = 20)))
         data.to.plot <- data.to.plot %>% tidyr::separate(col = id, into = c("ident1", 
-                                                                     "ident2"), sep = "_") %>% rowwise() %>% mutate(palette.use = colorlist[[ident2]], 
-                                                                                                                    ptcolor = colorRampPalette(colors = c("grey", palette.use))(20)[avg.exp.scale]) %>% 
+                         "ident2"), sep = "_") %>% rowwise() %>% mutate(palette.use = colorlist[[ident2]],
+                                  ptcolor = colorRampPalette(colors = c("grey", palette.use))(20)[avg.exp.scale]) %>% 
                 tidyr::unite("id", c("ident1", "ident2"), sep = "_")
         data.to.plot$genes.plot <- factor(x = data.to.plot$genes.plot, 
                                           levels = rev(x = sub(pattern = "-", replacement = ".", 
@@ -942,3 +1117,28 @@ SplitDotPlotGG.1 <- function (object, grouping.var, genes.plot,
         }
 }
 
+
+Types2Markers <- function(df, by = "Cell_Type"){
+        "Convert a list of N gene vector into a NX2 dataframe.
+        Input
+        df: N by 2 dataframe with gene at column1 and Cell_Type at column2.
+        by: certerial to group by, chose between Cell_Type, or cluster.
+        
+        Output 
+        List: list of N gene vector
+        ---------------------------"
+        # preparation
+        df <- df[,c("gene","Cell_Type","cluster")]
+        df[,"Cell_Type"] <- gsub(" ","_",df[,"Cell_Type"])
+        df[,"cluster"] <- gsub(" ","_",df[,"cluster"])
+        df <- df[gtools::mixedorder(df[,by]),]
+        
+        # Create a list contains marker gene vector
+        x <- unique(df[,by])
+        List <- list()
+        List <- lapply(seq_along(x), function(y, df, i) {
+                List[[i]]=unique(df[df[,by]==y[i],"gene"])},
+                y=x,df=df)
+        names(List) <- x
+        return(List)
+}

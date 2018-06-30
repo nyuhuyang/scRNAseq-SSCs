@@ -66,6 +66,11 @@ SSCs <- RunMultiCCA(object.list = SSCs_Seurat,
                     standardize =TRUE)
 save(SSCs, file = "./data/SSCs_alignment.Rda")
 
+# Calculate median UMI per cell
+SSCs_raw_data <- as.matrix(x = SSCs@raw.data)
+mean(colSums(SSCs_raw_data))
+median(colSums(SSCs_raw_data))
+boxplot(colSums(SSCs_raw_data))
 # CCA plot CC1 versus CC2 and look at a violin plot
 p1 <- DimPlot(object = SSCs, reduction.use = "cca", group.by = "orig.ident", 
               pt.size = 0.5, do.return = TRUE)
@@ -73,7 +78,7 @@ p2 <- VlnPlot(object = SSCs, features.plot = "CC1", group.by = "orig.ident",
               do.return = TRUE)
 plot_grid(p1, p2)
 
-
+AverageExpression()
 p3 <- MetageneBicorPlot(SSCs, grouping.var = "orig.ident", dims.eval = 1:50, 
                         display.progress = TRUE, display.progress = FALSE,
                         smooth = TRUE) # run on cluster
@@ -81,13 +86,14 @@ p3 + geom_smooth(method = 'loess')
 
 PrintDim(object = SSCs, reduction.type = "cca", dims.print = 1:2, genes.print = 10)
 
-DimHeatmap(object = SSCs, reduction.type = "cca", cells.use = 500, dim.use = c(1:3,32:35), 
+DimHeatmap(object = SSCs, reduction.type = "cca", cells.use = 500, dim.use = c(1:9), 
            do.balanced = TRUE)
-
+DimHeatmap(object = SSCs, reduction.type = "cca", cells.use = 500, dim.use = c(10:18), 
+           do.balanced = TRUE)
 #======1.3 QC =========================
 SSCs <- CalcVarExpRatio(object = SSCs, reduction.type = "pca",
-                              grouping.var = "orig.ident", dims.use = 1:35)
-SSCs <- SubsetData(SSCs, subset.name = "var.ratio.pca",accept.low = 0.5) #15633 out of 15650
+                              grouping.var = "orig.ident", dims.use = 1:10)
+SSCs <- SubsetData(SSCs, subset.name = "var.ratio.pca",accept.low = 0.5) #15555 out of 15650
 
 mito.genes <- grep(pattern = "^mt-", x = rownames(x = SSCs@data), value = TRUE)
 percent.mito <- Matrix::colSums(SSCs@raw.data[mito.genes, ])/Matrix::colSums(SSCs@raw.data)
@@ -100,20 +106,20 @@ SSCs <- FilterCells(object = SSCs, subset.names = c("nGene", "percent.mito"),
                           low.thresholds = c(500, -Inf), high.thresholds = c(7000, 0.15))
 
 par(mfrow = c(1, 2))
-GenePlot(object = SSCs, gene1 = "nUMI", gene2 = "orig.ident")
+GenePlot(object = SSCs, gene1 = "nUMI", gene2 = "percent.mito")
 GenePlot(object = SSCs, gene1 = "nUMI", gene2 = "nGene")
 
 #======1.4 align seurat objects =========================
 #Now we align the CCA subspaces, which returns a new dimensional reduction called cca.aligned
 set.seed(42)
 SSCs <- AlignSubspace(object = SSCs, reduction.type = "cca", grouping.var = "orig.ident", 
-                            dims.align = 1:35)
+                            dims.align = 1:10)
 #Now we can run a single integrated analysis on all cells!
 
-SSCs <- FindClusters(object = SSCs, reduction.type = "cca.aligned", dims.use = 1:35, 
-                           resolution = 0.2, force.recalc = T, save.SNN = TRUE)
+SSCs <- FindClusters(object = SSCs, reduction.type = "cca.aligned", dims.use = 1:10, 
+                           resolution = 1.0, force.recalc = T, save.SNN = TRUE)
 
-SSCs <- RunTSNE(object = SSCs, reduction.use = "cca.aligned", dims.use = 1:35, 
+SSCs <- RunTSNE(object = SSCs, reduction.use = "cca.aligned", dims.use = 1:10, 
                       do.fast = TRUE)
 
 p1 <- TSNEPlot(SSCs, do.return = T, pt.size = 1, group.by = "orig.ident")
@@ -127,7 +133,6 @@ TSNEPlot(object = SSCs,do.label = TRUE, group.by = "ident",
         ggtitle("TSNEplot for all cell clusters")+
         theme(text = element_text(size=20),     #larger text including legend title							
               plot.title = element_text(hjust = 0.5)) #title in middle
-
 
 #======1.5 RunPCA==================================
 SSCs <- FindVariableGenes(object = SSCs, mean.function = ExpMean, dispersion.function = LogVMR, 

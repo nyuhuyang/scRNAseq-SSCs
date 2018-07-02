@@ -84,10 +84,12 @@ customize_Seurat_FeatureHeatmap <- function(p, alpha.use = 1,
         # Change fill and colour gradient values
         p <- p + scale_colour_gradientn(colours = gradient.use, guide = F,
                                         limits = c(scaled.expression.threshold,
-                                                   max.scaled.exp), na.value = "grey") +
+                                                   max.scaled.exp),
+                                        na.value = "grey") +
                 scale_fill_gradientn(colours = gradient.use,
                                      name = expression(atop(Scaled, expression)),
-                                     limits = c(scaled.expression.threshold, max.scaled.exp),
+                                     limits = c(scaled.expression.threshold,
+                                                max.scaled.exp),
                                      na.value = "grey") +
                 scale_alpha_continuous(range = alpha.use, guide = F)
         
@@ -1141,4 +1143,9 @@ Types2Markers <- function(df, by = "Cell_Type"){
                 y=x,df=df)
         names(List) <- x
         return(List)
+}
+
+randomStrings <- function(n = 5000) {
+        a <- do.call(paste0, replicate(5, sample(LETTERS, n, TRUE), FALSE))
+        paste0(a, sprintf("%04d", sample(9999, n, TRUE)), sample(LETTERS, n, TRUE))
 }

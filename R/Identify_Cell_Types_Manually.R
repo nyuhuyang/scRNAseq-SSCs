@@ -393,19 +393,14 @@ SpermatogonialSC_cells$total <- All_cells$Freq
 SpermatogonialSC_cells$percentage <- SpermatogonialSC_cells$Freq/SpermatogonialSC_cells$total
 SpermatogonialSC_cells
 
-x <- FeatureHeatmap(object = SSCs, features.plot = c("Txndc8","Spag16"),
-                    group.by = "orig.ident", sep.scale = T, pt.size = 1, 
-                    cols.use = c("lightgrey","blue"), pch.use = 20, do.return = T)
+# FeatureHeatmap
+SSCs@meta.data$orig.ident <- gsub("Ad-","zAd-",SSCs@meta.data$orig.ident)
+x <- FeatureHeatmap(object = SSCs, features.plot = c("Txndc8","Spag16",
+                                                     "Dmrt1","Gfra1"),
+                    group.by = "orig.ident", sep.scale = T, pt.size = 0.5, 
+                    cols.use = c("gray98", "red"), pch.use = 20, do.return = T)
 
 x$data <- x$data[order(x$data$expression),]
-x
-#c("Pou5f1",uSSCs[c(5,9:10)],
-#====== 2.4 Compare cell type changes across conditions  ==========================================
-# the two patients profiled have very different composition
-# Compare clusters for each dataset
-SplitTSNEPlot(object = SSCs, split.by = "conditions")
-SplitTSNEPlot(object = SSCs, split.by = "orig.ident")
-#  test FindAllMarkers
-AllMarkers_cells <- FindAllMarkers.UMI(SSCs)
-AllMarkers_cells <- AllMarkers_cells[AllMarkers_cells$avg_logFC > 0,]
-write.csv(AllMarkers_cells,"./output/AllMarkers_cells.csv")
+customize_Seurat_FeatureHeatmap(x, alpha.use = 0.8,
+                                scaled.expression.threshold = 0,
+                                gradient.use = c("orangered", "red4"))

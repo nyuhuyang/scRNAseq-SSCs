@@ -6,7 +6,7 @@ source("./R/Seurat_functions.R")
 lnames = load(file = "./data/SSCs_alignment_8.Rda")
 lnames
 
-Featureplot <- function(x,object = SSCs,...){
+BlackAndWhiteFeatureplot <- function(x,object = SSCs,...){
     p <- FeaturePlot(object = object, 
                      reduction.use = "tsne",
                      features.plot = x, min.cutoff = NA, 
@@ -396,7 +396,7 @@ SpermatogonialSC_cells
 # FeatureHeatmap
 SSCs@meta.data$orig.ident <- gsub("Ad-","zAd-",SSCs@meta.data$orig.ident)
 x <- FeatureHeatmap(object = SSCs, features.plot = c("Txndc8","Spag16",
-                                                     "Dmrt1","Gfra1"),
+                                                     "Gfra1","Dmrt1"),
                     group.by = "orig.ident", sep.scale = T, pt.size = 0.5, 
                     cols.use = c("gray98", "red"), pch.use = 20, do.return = T)
 
@@ -404,3 +404,38 @@ x$data <- x$data[order(x$data$expression),]
 customize_Seurat_FeatureHeatmap(x, alpha.use = 0.8,
                                 scaled.expression.threshold = 0,
                                 gradient.use = c("orangered", "red4"))
+# histogram 
+lnames = load(file = "./data/SSCs_alignment_8.Rda")
+lnames
+genes <- c("Txndc8","Spag16","Gfra1","Dmrt1")
+CountsList <- list()
+for(i in 1:length(genes)) CountsList[[i]] <- CountsbyIdent(object = SSCs,
+                                                           subset.name = genes[i],
+                                                           accept.low = 1)
+CountsList[[length(genes)+1]] <- as.data.frame(table(SSCs@meta.data$orig.ident))
+library(plyr)
+CountsbyIdents <- join_all(CountsList, by='Var1', type='full')
+CountsbyIdents[is.na(CountsbyIdents)] <- 0
+rownames(CountsbyIdents) <- gsub("Ad-","zAd-",CountsbyIdents$Var1)
+CountsbyIdents <- CountsbyIdents[,-1]
+
+CountsbyIdents <- CountsbyIdents[sort(rownames(CountsbyIdents)),]
+CountsbyIdents
+
+percentbyIdents <- apply(CountsbyIdents,2,function(x){ x/CountsbyIdents$Freq } )
+percentbyIdents <- data.frame(percentbyIdents)
+percentbyIdents$samples <- rownames(percentbyIdents)
+percentbyIdents <- percentbyIdents[,!(colnames(percentbyIdents) %in% "Freq")]
+percentbyIdents
+library(reshape2)
+new_percentbyIdents <- melt(percentbyIdents,id=c("samples"))
+colnames(new_percentbyIdents)[2] <- "Gene.name"
+new_percentbyIdents
+ggplot(new_percentbyIdents, aes(x = samples, y = value, color = Gene.name)) +
+        geom_line(aes(group = Gene.name))+
+        ggtitle("Cell percentage with gene expression in each sample")+#ggplot title
+        theme(text = element_text(size=20),     #larger text including legend title							
+              plot.title = element_text(hjust = 0.5,size = 25, face = "bold"), #title in middle
+              axis.text.x  = element_text(angle=30, vjust=0.5))+#rotate xlab
+        guides(colour = guide_legend(override.aes = list(size=10)), #larger legend diagram 
+               shape = guide_legend(override.aes = list(size=10))) #larger legend diagram 

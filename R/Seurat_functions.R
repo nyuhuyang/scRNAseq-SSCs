@@ -1,3 +1,19 @@
+### histogram
+CountsbyIdent <- function(object = SSCs, subset.name = "Txndc8", accept.low = 1,use.raw = T,
+                          ident.remove = NULL, cells.use = NULL, accept.high = Inf, 
+                          accept.value = NULL, max.cells.per.ident = Inf, random.seed = 1, 
+                          ...){
+        "Generate nX2 dataframe with orig.ident at column1, Freq at column2"
+        cells.use <- WhichCells(object = SSCs, subset.name = subset.name, 
+                                   accept.low = accept.low,use.raw = T,...)
+        Cells.use <- data.frame("cells"=cells.use,"ident"=sub('_.*', '', cells.use))
+        Cells_ident <- as.data.frame(table(Cells.use$ident))
+        colnames(Cells_ident)[2] <- subset.name
+        return(Cells_ident)
+}
+
+
+
 #### For FeatureHeatmap() ####
 #https://github.com/satijalab/seurat/issues/235
 # Function to pseudo customize FeatureHeatmap
@@ -464,10 +480,10 @@ gg_colors <- function(object = object, return.vector=FALSE, cells.use = NULL,
 
 # HumanGenes
 # turn list of gene character to uniform Human gene list format
-HumanGenes <- function(seurat.object, marker.genes, unique=FALSE){
-        if(missing(seurat.object)) 
+HumanGenes <- function(object, marker.genes, unique=FALSE){
+        if(missing(object)) 
                 stop("A seurat object must be provided first")
-        if(class(seurat.object) != "seurat") 
+        if(class(object) != "seurat") 
                 stop("A seurat object must be provided first")
         if(missing(marker.genes)) 
                 stop("A list of marker genes must be provided")
@@ -476,7 +492,7 @@ HumanGenes <- function(seurat.object, marker.genes, unique=FALSE){
         marker.genes <- unlist(strsplit(marker.genes,","))
         #        marker.genes <- unique(genes)
         marker.genes <- toupper(marker.genes)
-        marker.genes <- marker.genes[marker.genes %in% seurat.object@raw.data@Dimnames[[1]]]
+        marker.genes <- CaseMatch(search = marker.genes, match = rownames(x = object@raw.data))
         if(unique) marker.genes <- unique(marker.genes)
         print(length(marker.genes))
         return(marker.genes)
@@ -593,10 +609,10 @@ Marker2Types <- function(x){
 
 # MouseGenes
 # turn list of gene character to uniform mouse gene list format
-MouseGenes <- function(seurat.object,marker.genes,unique =F){
-        if(missing(seurat.object)) 
+MouseGenes <- function(object,marker.genes,unique =F){
+        if(missing(object)) 
           stop("A seurat object must be provided first")
-        if(class(seurat.object) != "seurat") 
+        if(class(object) != "seurat") 
           stop("A seurat object must be provided first")
         if(missing(marker.genes)) 
           stop("A list of marker genes must be provided")
@@ -605,7 +621,7 @@ MouseGenes <- function(seurat.object,marker.genes,unique =F){
         marker.genes <- unlist(strsplit(marker.genes,","))
         #        marker.genes <- unique(genes)
         marker.genes <- Hmisc::capitalize(tolower(marker.genes))
-        marker.genes <- marker.genes[marker.genes %in% seurat.object@raw.data@Dimnames[[1]]]
+        marker.genes <- CaseMatch(search = marker.genes, match = rownames(x = object@raw.data))
         if(unique) marker.genes <- unique(marker.genes)
         print(length(marker.genes))
         return(marker.genes)

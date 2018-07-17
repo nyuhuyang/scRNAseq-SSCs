@@ -114,6 +114,7 @@ GenePlot(object = SSCs, gene1 = "nUMI", gene2 = "nGene")
 set.seed(42)
 SSCs <- AlignSubspace(object = SSCs, reduction.type = "cca", grouping.var = "orig.ident", 
                             dims.align = 1:10)
+SSCs@project.name <- "Paula"
 #Now we can run a single integrated analysis on all cells!
 
 SSCs <- FindClusters(object = SSCs, reduction.type = "cca.aligned", dims.use = 1:10, 

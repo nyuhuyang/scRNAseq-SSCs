@@ -18,7 +18,7 @@ BlackAndWhiteFeatureplot <- function(x,object = SSCs,...){
 Embryonic_SCs <- MouseGenes(SSCs,c("ALPL","ALPP","ALPI","ALPPL2","TNFRSF8","TDGF1",
                                    "PODXL","NR6A1","POU5F1","B3GALNT1",
                                    "FUT1","FUT2","KIT","TERT","TERC","TEP1",
-                                   "NANOG","SOX2"))
+                                   "NANOG","SOX2","Dppa5","Klf4","zfp42","Spp1"))
 Ectoderm <- MouseGenes(SSCs,c("NES","NCAM1","PAX6","VIM"))# VIM
 Mesoderm <- MouseGenes(SSCs,c("BMP4","TBXT"))
 Endoderm <- MouseGenes(SSCs,c("AFP","GATA4","HNF4A"))
@@ -34,7 +34,7 @@ HSC <- MouseGenes(SSCs,c("CD34","CD38","KIT","ATXN1","THY1",
                          mouse_lin,human_lin),unique = T)
 Collagen <- MouseGenes(SSCs,c("COL2A1","COL1A1","COL1A2"),unique =T)
 
-
+Housekeeping <- MouseGenes(SSCs,c("Rnr2","Rpl4","Actb","Gnas","Tubb5","Kras","Calb1"))
 # Blood Vessel=====
 Endothelium <- MouseGenes(SSCs,c("Cdh5","Pecam1","Flt1","Plvap","Kdr","ptprb",
                                  "Vwf","EMCN","Car4","VEGFA"))
@@ -55,7 +55,7 @@ X_chromosome <- MouseGenes(SSCs,c("Xist"))
 Hepatocyte <- MouseGenes(SSCs,c("ALB","ITGB1"))
 
 # Nervous System
-Neuron
+Neuron2A <- MouseGenes(SSCs,c("Tmod2","Skil","Slc30a1","Erbb2ip","PCDHA@","Vgf","Gabrb3"))
 
 Epithelium <- MouseGenes(SSCs,c("Epcam","KRT19","KRT5",
                                "MUC1","SCGB3A2","SCGB1A1","SCGB3A1","SFTPB","FOXJ1","Rpe65",
@@ -149,6 +149,9 @@ other_SSCs <- MouseGenes(SSCs,c("EXOSC10","SLC22A2","DMRT1","MKI67", "SSX2B","SS
 Spermatocyte <- MouseGenes(SSCs,c("KHDRBS1","SPAG16","CATSPER2","SLC25A31","SPAG6"))
 spermatozoids <- MouseGenes(SSCs,c("THY1","STRC","DEL15Q15.3","DAZ1","DAZ2","DAZ3","DAZ3"))
 defective_spermatozoa <- MouseGenes(SSCs,c("TXNDC8","TXNDC2","ALOX15","NME8")) #TXNDC8(SPTRX3), ALOX15(15-LOX)
+
+# 
+
 
 #  test FindAllMarkers=============
 AllMarkers <- FindAllMarkers.UMI(SSCs, logfc.threshold = 0.25,
@@ -380,7 +383,7 @@ p2 <- TSNEPlot(SSCs, do.return = T, pt.size = 1, group.by = "ident")
 #png('./output/TSNESplot_alignment.png')
 plot_grid(p1, p2)
 
-TSNEPlot(object = SSCs, no.legend = F, do.label = F,
+TSNEPlot(object = SSCs, no.legend = T, do.label = T,
          do.return = TRUE, label.size = 5)+
         ggtitle("TSNE plot of major cell types")+
         theme(text = element_text(size=20),     #larger text including legend title							
@@ -439,3 +442,5 @@ ggplot(new_percentbyIdents, aes(x = samples, y = value, color = Gene.name)) +
               axis.text.x  = element_text(angle=30, vjust=0.5))+#rotate xlab
         guides(colour = guide_legend(override.aes = list(size=10)), #larger legend diagram 
                shape = guide_legend(override.aes = list(size=10))) #larger legend diagram 
+
+

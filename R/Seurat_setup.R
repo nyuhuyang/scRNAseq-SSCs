@@ -6,7 +6,8 @@
 
 library(Seurat)
 library(dplyr)
-source("./R/Seurat_functions.R")
+library(ggrepel)
+source("../R/Seurat_functions.R")
 ########################################################################
 #
 #  1 Seurat Alignment 
@@ -128,10 +129,10 @@ p2 <- TSNEPlot(SSCs, do.return = T, pt.size = 1, group.by = "ident")
 #png('./output/TSNESplot_alignment.png')
 plot_grid(p1, p2)
 #dev.off()
-TSNEPlot(object = SSCs,do.label = TRUE, group.by = "ident", 
-         do.return = TRUE, no.legend = TRUE,
+TSNEPlot(object = SSCs,do.label = T, group.by = "ident", 
+         do.return = TRUE, no.legend = T,
          pt.size = 1,label.size = 8 )+
-        ggtitle("TSNEplot for all cell clusters")+
+        ggtitle("All samples")+
         theme(text = element_text(size=20),     #larger text including legend title							
               plot.title = element_text(hjust = 0.5)) #title in middle
 
@@ -142,18 +143,16 @@ hv.genes <- head(rownames(SSCs@hvg.info), 1000)
 SSCs <- RunPCA(object = SSCs, pc.genes = hv.genes, pcs.compute = 100, do.print = TRUE, 
               pcs.print = 1:5, genes.print = 5)
 PCElbowPlot(object = SSCs, num.pc = 100)
-PCHeatmap(SSCs, pc.use = c(1:3, 45:50), cells.use = 500, do.balanced = TRUE)
-SSCs <- FindClusters(object = SSCs, reduction.type = "pca", dims.use = 1:50, resolution = 1, 
+PCHeatmap(SSCs, pc.use = c(1:3, 25:30), cells.use = 500, do.balanced = TRUE)
+SSCs <- FindClusters(object = SSCs, reduction.type = "pca", dims.use = 1:30, resolution = 1, 
                     save.SNN = TRUE, n.start = 10, nn.eps = 0.5, print.output = FALSE)
-SSCs <- RunTSNE(object = SSCs, reduction.use = "pca", dims.use = 1:50, tsne.method = "FIt-SNE", 
-               nthreads = 4, reduction.name = "FItSNE", reduction.key = "FItSNE_", 
-               fast_tsne_path = "/Users/yah2014/src/FIt-SNE/bin/fast_tsne", 
-               max_iter = 2000)
-DimPlot(object = SSCs, reduction.use = "FItSNE",do.label = TRUE,  
-        no.legend = TRUE, group.by = "orig.ident", 
-        do.return = TRUE, vector.friendly = F,
-        pt.size = 1,label.size = 8 ) + 
-        ggtitle("TSNEplot for all cell clusters")+
-        theme(text = element_text(size=20),     #larger text including legend title							
-              plot.title = element_text(hjust = 0.5)) #title in middle
-save(SSCs, file = "./data/SSCs_alignment_8.Rda")
+SSCs <- RunTSNE(object = SSCs, reduction.use = "pca", dims.use = 1:30, 
+                do.fast = TRUE)
+TSNEPlot(object = SSCs,do.label = T, group.by = "orig.ident", 
+         do.return = TRUE, no.legend = T,
+         pt.size = 1,label.size = 8 )+
+        ggtitle("All samples")+
+        theme(text = element_text(size=15),     #larger text including legend title							
+              plot.title = element_text(hjust = 0.5)) 
+
+save(SSCs, file = "./data/SSCs_alignment.Rda")

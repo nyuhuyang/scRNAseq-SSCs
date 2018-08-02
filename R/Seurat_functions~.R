@@ -14,6 +14,62 @@ CountsbyIdent <- function(object = SSCs, subset.name = "Txndc8", accept.low = 1,
 
 
 
+#' Convert counts to transcripts per million (TPM).
+#' 
+#' Convert a numeric matrix of features (rows) and conditions (columns) with
+#' raw feature counts to transcripts per million.
+#' 
+#'    Lior Pachter. Models for transcript quantification from RNA-Seq.
+#'    arXiv:1104.3889v2 
+#'    
+#'    Wagner, et al. Measurement of mRNA abundance using RNA-seq data:
+#'    RPKM measure is inconsistent among samples. Theory Biosci. 24 July 2012.
+#'    doi:10.1007/s12064-012-0162-3
+#'    
+#' @param counts A numeric matrix of raw feature counts i.e.
+#'  fragments assigned to each gene.
+#' @param featureLength A numeric vector with feature lengths.
+#' @param meanFragmentLength A numeric vector with mean fragment lengths.
+#' @return tpm A numeric matrix normalized by library size and feature length.
+counts_to_tpm <- function(counts, featureLength, meanFragmentLength) {
+        
+        # Ensure valid arguments.
+        stopifnot(length(featureLength) == nrow(counts))
+        stopifnot(length(meanFragmentLength) == ncol(counts))
+        
+        # Compute effective lengths of features in each library.
+        effLen <- do.call(cbind, lapply(1:ncol(counts), function(i) {
+                featureLength - meanFragmentLength[i] + 1
+        }))
+        
+        # Exclude genes with length less than the mean fragment length.
+        idx <- apply(effLen, 1, function(x) min(x) > 1)
+        counts <- counts[idx,]
+        effLen <- effLen[idx,]
+        featureLength <- featureLength[idx]
+        
+        # Process one column at a time.
+        tpm <- do.call(cbind, lapply(1:ncol(counts), function(i) {
+                rate = log(counts[,i]) - log(effLen[,i])
+                denom = log(sum(exp(rate)))
+                exp(rate - denom + log(1e6))
+        }))
+        
+        # Copy the row and column names from the original matrix.
+        colnames(tpm) <- colnames(counts)
+        rownames(tpm) <- rownames(counts)
+        return(tpm)
+}
+
+rpkm <- function(counts, lengths) {
+        rate <- counts / lengths 
+        rate / sum(counts) * 1e6
+}
+
+tpm <- function(counts, lengths) {
+        rate <- counts / lengths
+        rate / sum(rate) * 1e6
+}
 #### For FeatureHeatmap() ####
 #https://github.com/satijalab/seurat/issues/235
 # Function to pseudo customize FeatureHeatmap
@@ -112,6 +168,265 @@ customize_Seurat_FeatureHeatmap <- function(p, alpha.use = 1,
         # Return plot
         p
 }
+
+#### For FeatureHeatmap() ####
+# Function to pseudo customize FeatureHeatmap
+customize_Seurat_Featureplot <- function(p, alpha.use = 0.8, 
+                                         gradient.use = c("yellow", "red"),
+                                         scaled.expression.threshold = 0) {
+        
+        # Order data by scaled gene expresion level
+        p$data <- p$data[order(p$data$gene),]
+        
+        # Define lower limit of scaled gene expression level
+        if (!is.null(scaled.expression.threshold)) {
+                scaled.expression.threshold <- scaled.expression.threshold
+        } else if (is.null(scaled.expression.threshold)) {
+                scaled.expression.threshold <- min(p$data$gene)
+        }
+        
+        # Compute maximum value in gene expression
+        max.scaled.exp <- max(p$data$gene)
+        
+        # Fill points using the scaled gene expression levels
+        p$layers[[1]]$mapping$fill <- p$layers[[1]]$mapping$colour
+        
+        # Define transparency of points
+        p$layers[[1]]$mapping$alpha <- alpha.use
+        
+        # Change fill and colour gradient values
+        p <- p + scale_colour_gradientn(colours = gradient.use, guide = F,
+                                        limits = c(scaled.expression.threshold,
+                                                   max.scaled.exp),
+                                        na.value = "grey") +
+                scale_fill_gradientn(colours = gradient.use,
+                                     name = expression(atop(Scaled, expression)),
+                                     limits = c(scaled.expression.threshold,
+                                                max.scaled.exp),
+                                     na.value = "grey") +
+                scale_alpha_continuous(range = alpha.use, guide = F)
+        
+        # Return plot
+        p
+}
+
+
+# add geom_text_repel
+DimPlot.1 <- function (object, reduction.use = "pca", dim.1 = 1, dim.2 = 2, 
+          cells.use = NULL, pt.size = 1, do.return = FALSE, do.bare = FALSE, 
+          cols.use = NULL, group.by = "ident", pt.shape = NULL, do.hover = FALSE, 
+          data.hover = "ident", do.identify = FALSE, do.label = FALSE, 
+          label.size = 4, no.legend = FALSE, coord.fixed = FALSE, 
+          no.axes = FALSE, dark.theme = FALSE, plot.order = NULL, 
+          cells.highlight = NULL, cols.highlight = "red", sizes.highlight = 1, 
+          plot.title = NULL, vector.friendly = FALSE, png.file = NULL, 
+          png.arguments = c(10, 10, 100), na.value = "grey50", ...) 
+{
+        if (vector.friendly) {
+                previous_call <- blank_call <- png_call <- match.call()
+                blank_call$pt.size <- -1
+                blank_call$do.return <- TRUE
+                blank_call$vector.friendly <- FALSE
+                png_call$no.axes <- TRUE
+                png_call$no.legend <- TRUE
+                png_call$do.return <- TRUE
+                png_call$vector.friendly <- FALSE
+                png_call$plot.title <- NULL
+                blank_plot <- eval(blank_call, sys.frame(sys.parent()))
+                png_plot <- eval(png_call, sys.frame(sys.parent()))
+                png.file <- Seurat:::SetIfNull(x = png.file, default = paste0(tempfile(), 
+                                                                     ".png"))
+                ggsave(filename = png.file, plot = png_plot, width = png.arguments[1], 
+                       height = png.arguments[2], dpi = png.arguments[3])
+                to_return <- AugmentPlot(plot1 = blank_plot, imgFile = png.file)
+                file.remove(png.file)
+                if (do.return) {
+                        return(to_return)
+                }
+                else {
+                        print(to_return)
+                }
+        }
+        embeddings.use <- GetDimReduction(object = object, reduction.type = reduction.use, 
+                                          slot = "cell.embeddings")
+        if (length(x = embeddings.use) == 0) {
+                stop(paste(reduction.use, "has not been run for this object yet."))
+        }
+        cells.use <- Seurat:::SetIfNull(x = cells.use, default = colnames(x = object@data))
+        dim.code <- GetDimReduction(object = object, reduction.type = reduction.use, 
+                                    slot = "key")
+        dim.codes <- paste0(dim.code, c(dim.1, dim.2))
+        data.plot <- as.data.frame(x = embeddings.use)
+        cells.use <- intersect(x = cells.use, y = rownames(x = data.plot))
+        data.plot <- data.plot[cells.use, dim.codes]
+        ident.use <- as.factor(x = object@ident[cells.use])
+        if (group.by != "ident") {
+                ident.use <- as.factor(x = FetchData(object = object, 
+                                                     vars.all = group.by)[cells.use, 1])
+        }
+        data.plot$ident <- ident.use
+        data.plot$x <- data.plot[, dim.codes[1]]
+        data.plot$y <- data.plot[, dim.codes[2]]
+        data.plot$pt.size <- pt.size
+        if (!is.null(x = cells.highlight)) {
+                if (is.character(x = cells.highlight)) {
+                        cells.highlight <- list(cells.highlight)
+                }
+                else if (is.data.frame(x = cells.highlight) || !is.list(x = cells.highlight)) {
+                        cells.highlight <- as.list(x = cells.highlight)
+                }
+                cells.highlight <- lapply(X = cells.highlight, FUN = function(cells) {
+                        cells.return <- if (is.character(x = cells)) {
+                                cells[cells %in% rownames(x = data.plot)]
+                        }
+                        else {
+                                cells <- as.numeric(x = cells)
+                                cells <- cells[cells <= nrow(x = data.plot)]
+                                rownames(x = data.plot)[cells]
+                        }
+                        return(cells.return)
+                })
+                cells.highlight <- Filter(f = length, x = cells.highlight)
+                if (length(x = cells.highlight) > 0) {
+                        if (!no.legend) {
+                                no.legend <- is.null(x = names(x = cells.highlight))
+                        }
+                        names.highlight <- if (is.null(x = names(x = cells.highlight))) {
+                                paste0("Group_", 1L:length(x = cells.highlight))
+                        }
+                        else {
+                                names(x = cells.highlight)
+                        }
+                        sizes.highlight <- rep_len(x = sizes.highlight, 
+                                                   length.out = length(x = cells.highlight))
+                        cols.highlight <- rep_len(x = cols.highlight, length.out = length(x = cells.highlight))
+                        highlight <- rep_len(x = NA_character_, length.out = nrow(x = data.plot))
+                        if (is.null(x = cols.use)) {
+                                cols.use <- "black"
+                        }
+                        cols.use <- c(cols.use[1], cols.highlight)
+                        size <- rep_len(x = pt.size, length.out = nrow(x = data.plot))
+                        for (i in 1:length(x = cells.highlight)) {
+                                cells.check <- cells.highlight[[i]]
+                                index.check <- match(x = cells.check, rownames(x = data.plot))
+                                highlight[index.check] <- names.highlight[i]
+                                size[index.check] <- sizes.highlight[i]
+                        }
+                        plot.order <- sort(x = unique(x = highlight), na.last = TRUE)
+                        plot.order[is.na(x = plot.order)] <- "Unselected"
+                        highlight[is.na(x = highlight)] <- "Unselected"
+                        highlight <- as.factor(x = highlight)
+                        data.plot$ident <- highlight
+                        data.plot$pt.size <- size
+                        if (dark.theme) {
+                                cols.use[1] <- "white"
+                        }
+                }
+        }
+        if (!is.null(x = plot.order)) {
+                if (any(!plot.order %in% data.plot$ident)) {
+                        stop("invalid ident in plot.order")
+                }
+                plot.order <- rev(x = c(plot.order, setdiff(x = unique(x = data.plot$ident), 
+                                                            y = plot.order)))
+                data.plot$ident <- factor(x = data.plot$ident, levels = plot.order)
+                data.plot <- data.plot[order(data.plot$ident), ]
+        }
+        p <- ggplot(data = data.plot, mapping = aes(x = x, y = y)) + 
+                geom_point(mapping = aes(colour = factor(x = ident), 
+                                         size = pt.size))
+        if (!is.null(x = pt.shape)) {
+                shape.val <- FetchData(object = object, vars.all = pt.shape)[cells.use, 
+                                                                             1]
+                if (is.numeric(shape.val)) {
+                        shape.val <- cut(x = shape.val, breaks = 5)
+                }
+                data.plot[, "pt.shape"] <- shape.val
+                p <- ggplot(data = data.plot, mapping = aes(x = x, y = y)) + 
+                        geom_point(mapping = aes(colour = factor(x = ident), 
+                                                 shape = factor(x = pt.shape), size = pt.size))
+        }
+        if (!is.null(x = cols.use)) {
+                p <- p + scale_colour_manual(values = cols.use, na.value = na.value)
+        }
+        if (coord.fixed) {
+                p <- p + coord_fixed()
+        }
+        p <- p + guides(size = FALSE)
+        p2 <- p + xlab(label = dim.codes[[1]]) + ylab(label = dim.codes[[2]]) + 
+                scale_size(range = c(min(data.plot$pt.size), max(data.plot$pt.size)))
+        p3 <- p2 + Seurat:::SetXAxisGG() + Seurat:::SetYAxisGG() + 
+                Seurat:::SetLegendPointsGG(x = 6) + 
+                Seurat:::SetLegendTextGG(x = 12) + Seurat:::no.legend.title + theme_bw() + 
+                Seurat:::NoGrid()
+        if (dark.theme) {
+                p <- p + DarkTheme()
+                p3 <- p3 + DarkTheme()
+        }
+        p3 <- p3 + theme(legend.title = element_blank())
+        if (!is.null(plot.title)) {
+                p3 <- p3 + ggtitle(plot.title) + theme(plot.title = element_text(hjust = 0.5))
+        }
+        if (do.label) {
+                centers <- data.plot %>% dplyr::group_by(ident) %>% 
+                        dplyr::summarize(x = median(x = x), y = median(x = y))
+                p3 <- p3 + geom_point(data = centers, 
+                                      mapping = aes(x = x,y = y),
+                                      size = 0, alpha = 0) + 
+                        #geom_text(data = centers, 
+                        #          mapping = aes(label = ident), size = label.size)+
+                        ggrepel::geom_text_repel(data = centers, aes(x = x, y = y,label = ident),
+                                                 size = label.size)}
+        if (no.legend) {
+                p3 <- p3 + theme(legend.position = "none")
+        }
+        if (no.axes) {
+                p3 <- p3 + theme(axis.line = element_blank(), axis.text.x = element_blank(), 
+                                 axis.text.y = element_blank(), axis.ticks = element_blank(), 
+                                 axis.title.x = element_blank(), axis.title.y = element_blank(), 
+                                 panel.background = element_blank(), panel.border = element_blank(), 
+                                 panel.grid.major = element_blank(), panel.grid.minor = element_blank(), 
+                                 plot.background = element_blank())
+        }
+        if (do.identify || do.hover) {
+                if (do.bare) {
+                        plot.use <- p
+                }
+                else {
+                        plot.use <- p3
+                }
+                if (do.hover) {
+                        if (is.null(x = data.hover)) {
+                                features.info <- NULL
+                        }
+                        else {
+                                features.info <- FetchData(object = object, 
+                                                           vars.all = data.hover)
+                        }
+                        return(HoverLocator(plot = plot.use, data.plot = data.plot, 
+                                            features.info = features.info, dark.theme = dark.theme))
+                }
+                else if (do.identify) {
+                        return(FeatureLocator(plot = plot.use, data.plot = data.plot, 
+                                              dark.theme = dark.theme, ...))
+                }
+        }
+        if (do.return) {
+                if (do.bare) {
+                        return(p)
+                }
+                else {
+                        return(p3)
+                }
+        }
+        if (do.bare) {
+                print(p)
+        }
+        else {
+                print(p3)
+        }
+}
+
 
 
 # combine FindAllMarkers and calculate average UMI
@@ -433,6 +748,14 @@ FindAllMarkersAcrossConditions<- function(object, genes.use = NULL, logfc.thresh
 }
 
 
+#=====Clean memory======================
+GC <- function()
+{
+        while (gc()[2, 4] != gc()[2, 4] | gc()[1, 4] != gc()[1,
+                                                             4]) {
+        }
+}
+
 ##
 gg_colors <- function(object = object, return.vector=FALSE, cells.use = NULL,
                       no.legend = TRUE, do.label = TRUE,
@@ -643,25 +966,37 @@ MouseGenes <- function(object,marker.genes,unique =F){
         return(as.character(marker.genes))
 }
 
-# rename ident back to 0,1,2,3...
-# convert character ident to numeric
-# RenameIdent function will generate error if new.cluster.ids overlap with old.ident.ids
-# so if want to rename ident smoothly, plyr::mapvalues is still better
-RenameIdentBack <- function(object){
-        old.ident.ids <- levels(object@ident)
-        old.ident.ids <- sort(old.ident.ids)
-        new.cluster.ids <- as.numeric(as.factor(old.ident.ids))
-        object@ident <- plyr::mapvalues(x = object@ident,
-                                        from = old.ident.ids,
-                                        to = new.cluster.ids)
+
+randomStrings <- function(n = 5000) {
+        a <- do.call(paste0, replicate(5, sample(LETTERS, n, TRUE), FALSE))
+        paste0(a, sprintf("%04d", sample(9999, n, TRUE)), sample(LETTERS, n, TRUE))
+}
+
+# rename ident for certain cells only
+# cells.use is vector of cell name
+RenameIdent.1 <- function (object, old.ident.name = NULL, new.ident.name = NULL,
+                             cells.use = NULL) 
+{
+        if (!is.null(old.ident.name)) {
+                if(!old.ident.name %in% object@ident) {
+                 stop(paste("Error : ", old.ident.name, " is not a current identity class"))
+                }
+        }
+        new.levels <- old.levels <- levels(x = object@ident)
+        ident.vector <- as.character(x = object@ident)
+        names(x = ident.vector) <- names(object@ident)
+        ident.vector[cells.use] <- new.ident.name
+        object@ident <- factor(x = ident.vector, levels = new.levels)
         return(object)
 }
+
 
 # FeaturePlot doesn't return ggplot
 # SingleFeaturePlot doesn't take seurat object as input
 # modified SingleFeaturePlot, take seurat object and return ggplot
-SingleFeaturePlot.1 <- function (object = object, feature = feature, pt.size = 1,
+SingleFeaturePlot.1 <- function (object = object, feature = feature, pt.size = 1.2,
                                  dim.1 = 1, dim.2 = 2,pch.use = 16, cols.use  = c("lightgrey","blue"),
+                                 gradient.use = c("orangered", "red4"),threshold=0.1,text.size=15,
                                  cells.use = NULL,dim.codes, min.cutoff = 0, max.cutoff = Inf,
                                  use.imputed = FALSE, reduction.use = "tsne",no.axes = FALSE, no.legend = TRUE, 
                                  dark.theme = FALSE, do.return = FALSE) 
@@ -741,7 +1076,7 @@ SingleFeaturePlot.1 <- function (object = object, feature = feature, pt.size = 1
                                                                        axis.title.y = element_blank())
         }
         else {
-                p <- p + labs(title = feature, x = dim.codes[1], y = dim.codes[2])
+                p <- p + labs(x = dim.codes[1], y = dim.codes[2])
         }
         if (no.legend) {
                 p <- p + theme(legend.position = "none")
@@ -749,9 +1084,65 @@ SingleFeaturePlot.1 <- function (object = object, feature = feature, pt.size = 1
         if (dark.theme) {
                 p <- p + DarkTheme()
         }
+        p$data <- p$data[order(p$data$gene),]
+        p <- customize_Seurat_Featureplot(p, alpha.use = 1,
+                                          scaled.expression.threshold = threshold,
+                                          gradient.use = gradient.use)
+        p <- p +ggtitle(feature)+
+                theme(text = element_text(size=text.size),     #larger text including legend title							
+                      axis.text.x = element_text(size=text.size*0.8),
+                      axis.text.y = element_text(size=text.size*0.8),
+                      plot.title = element_text(hjust = 0.5,size=text.size*1.5)) #title in middle
         return(p)
 }
 
+
+SingleR.Subset.1 <- function (singler, subsetdata) 
+{
+        s = singler
+        if (!is.null(s$seurat)) {
+                s$seurat = SubsetData(s$seurat, colnames(s$seurat@data)[subsetdata])
+                subsetdata = unlist(lapply(s$seurat@cell.names, FUN = function(x) which(singler$singler[[1]]$SingleR.single$cell.names == 
+                                                                                                x)))
+        }
+        for (i in 1:length(s$singler)) {
+                s$singler[[i]]$SingleR.single$cell.names = s$singler[[i]]$SingleR.single$cell.names[subsetdata]
+                s$singler[[i]]$SingleR.clusters$cell.names = s$singler[[i]]$SingleR.clusters$cell.names[subsetdata]
+                s$singler[[i]]$SingleR.single$scores = s$singler[[i]]$SingleR.single$scores[subsetdata, 
+                                                                                            ]
+                s$singler[[i]]$SingleR.single$labels = as.matrix(s$singler[[i]]$SingleR.single$labels[subsetdata, 
+                                                                                                      ])
+                
+                if(length(s$singler[[i]]$SingleR.single$labels1)>1) {
+                        s$singler[[i]]$SingleR.single$labels1 = as.matrix(s$singler[[i]]$SingleR.single$labels1[subsetdata, 
+                                                                                                                ])}
+                s$singler[[i]]$SingleR.single$clusters$cl = s$singler[[i]]$SingleR.single$clusters$cl[subsetdata]
+                if (!is.null(s$singler[[i]]$SingleR.single.main)) {
+                        s$singler[[i]]$SingleR.single.main$cell.names = s$singler[[i]]$SingleR.single.main$cell.names[subsetdata]
+                        s$singler[[i]]$SingleR.clusters.main$cell.names = s$singler[[i]]$SingleR.clusters.main$cell.names[subsetdata]
+                        s$singler[[i]]$SingleR.single.main$scores = s$singler[[i]]$SingleR.single.main$scores[subsetdata, 
+                                                                                                              ]
+                        s$singler[[i]]$SingleR.single.main$labels = as.matrix(s$singler[[i]]$SingleR.single.main$labels[subsetdata, 
+                                                                                                                        ])
+                        if(length(s$singler[[i]]$SingleR.single$labels1)>1) {
+                                s$singler[[i]]$SingleR.single.main$labels1 = as.matrix(s$singler[[i]]$SingleR.single.main$labels1[subsetdata, 
+                                                                                                                          ])}
+                        s$singler[[i]]$SingleR.single.main$clusters$cl = s$singler[[i]]$SingleR.single.main$clusters$cl[subsetdata]
+                }
+        }
+        if (!is.null(s[["signatures"]])) {
+                s$signatures = s$signatures[subsetdata, ]
+        }
+        if (!is.null(s[["other"]])) {
+                s$other = s$other[subsetdata]
+        }
+        if (!is.null(s$meta.data)) {
+                s$meta.data$orig.ident = factor(as.character(s$meta.data$orig.ident[subsetdata]))
+                s$meta.data$xy = s$meta.data$xy[subsetdata, ]
+                s$meta.data$clusters = factor(as.character(s$meta.data$clusters[subsetdata]))
+        }
+        s
+}
 
 SingleR.PlotTsne.1 <- function (SingleR, xy, labels = SingleR$labels, clusters = NULL, 
           do.letters = TRUE, dot.size = 1, do.labels = FALSE, do.legend = TRUE, 
@@ -796,14 +1187,13 @@ SingleR.PlotTsne.1 <- function (SingleR, xy, labels = SingleR$labels, clusters =
                 if (label.repel == TRUE) {
                         p = p + ggrepel::geom_label_repel(data = centers, 
                                                           aes(label = ident),
-                                                          fontface = "bold",
                                                           force = force)
                 }
                 else if (text.repel == TRUE){
                         p = p + ggrepel::geom_text_repel(data = centers, aes(x = x,
                                                                              y = y,
                                                                              label = ident),
-                                                         fontface = "bold",force = force,
+                                                         force = force,
                                                          inherit.aes = FALSE)     
                         }
                 p = p + guides(colour = FALSE)
@@ -922,7 +1312,7 @@ SplitSingler <- function(singler = singler, split.by = "conditions"){
         object.subsets <- list()
         for(i in 1:(length(cell.subsets)-1)){
                 cell.index <- which(singler$seurat@cell.names %in% cell.subsets[[i]])
-                object.subsets[[i]] <- SingleR::SingleR.Subset(singler=singler,
+                object.subsets[[i]] <- SingleR.Subset.1(singler=singler,
                                                                subsetdata =cell.index)
         }
         object.subsets[[i+1]] <- cell.subsets[[i+1]] # record conditions in the last return
@@ -967,9 +1357,9 @@ SplitTSNEPlot <- function(object = object, split.by = "conditions",
 
 
 SplitSingleR.PlotTsne <- function(singler = singler, split.by = "conditions",
-                          select.plots = NULL, return.plots = FALSE,
-                          do.label=T,do.letters = F,
-                          label.size = 4, dot.size = 3,... ){
+                                  select.plots = NULL, return.plots = FALSE,
+                                  do.label= TRUE,do.letters = FALSE,show.subtype = TRUE,
+                                  label.size = 4, dot.size = 3,legend.size = NULL,... ){
         "
         split singler by certein criteria, and generate TSNE plot
         
@@ -977,8 +1367,9 @@ SplitSingleR.PlotTsne <- function(singler = singler, split.by = "conditions",
         -------------------
         singler: singler object with seurat
         split.by: the criteria to split
-        select.plots：select first several plots
+        select.plots：change order to output, such as c(2,1)
         return.data: TRUE/FASLE, return splited ojbect or not.
+        show.subtype: TRUE/FASLE, show sub cell type or not.
         
         Outputs
         --------------------
@@ -990,17 +1381,21 @@ SplitSingleR.PlotTsne <- function(singler = singler, split.by = "conditions",
         out <- list()
         p <- list()
         if(is.null(select.plots)) select.plots <- 1:length(conditions)
-        for(i in select.plots){ 
-                out[[i]] <- SingleR.PlotTsne.1(object.subsets[[i]]$singler[[1]]$SingleR.single,
-                                      object.subsets[[i]]$meta.data$xy,
-                                      do.label=do.label,do.letters = do.letters,
-                                      labels = object.subsets[[i]]$singler[[1]]$SingleR.single$labels,
-                                      label.size = label.size, dot.size = dot.size,...)
-                out[[i]]$p <- out[[i]]$p +
-                        ggtitle(conditions[i])+
+        sp = select.plots
+        if(show.subtype) st =1 else st =2
+        for(i in 1:length(select.plots)){ 
+                out[[i]] <- SingleR.PlotTsne.1(object.subsets[[sp[i]]]$singler[[st]]$SingleR.single,
+                                               object.subsets[[sp[i]]]$meta.data$xy,
+                                               do.label=do.label,do.letters = do.letters,
+                                               labels = object.subsets[[sp[i]]]$singler[[st]]$SingleR.single$labels,
+                                               label.size = label.size, dot.size = dot.size,...)
+                out[[i]]$p = out[[i]]$p +
+                        ggtitle(conditions[sp[i]])+
                         theme(text = element_text(size=20),   #larger text including legend title							
-                              plot.title = element_text(hjust = 0.5)) #title in middle
-                p[[i]] <- out[[i]]$p
+                              plot.title = element_text(hjust = 0.5))#title in middle
+                if(!is.null(legend.size))
+                        out[[i]]$p = out[[i]]$p + theme(legend.text = element_text(size=legend.size))
+                p[[i]] = out[[i]]$p
         }
         out <- out[lapply(out,length)>0] # remove NULL element
         p <- p[lapply(p,length)>0] # remove NULL element
@@ -1085,151 +1480,6 @@ SplitFindAllMarkers <- function(object,split.by = "conditions", write.csv = TRUE
                                                     ".csv"))
         }
         return(object.markers)
-}
-
-
-# find and print differentially expressed genes across conditions ================
-# combine SetIdent,indMarkers and avg_UMI
-
-TSNEPlot.3D <- function (object, reduction.use = "tsne", dim.1 = 1, dim.2 = 2, dim.3 = 3,
-                         cells.use = NULL, pt.size = 1, do.return = FALSE, do.bare = FALSE, 
-                         cols.use = NULL, group.by = "ident", pt.shape = NULL, do.hover = FALSE, 
-                         data.hover = "ident", do.identify = FALSE, do.label = FALSE, 
-                         label.size = 4, no.legend = FALSE, no.axes = FALSE, dark.theme = FALSE, 
-                         plot.order = NULL, plot.title = NULL, ...) 
-{
-        embeddings.use = GetDimReduction(object = object, reduction.type = reduction.use, 
-                                         slot = "cell.embeddings")
-        if (length(x = embeddings.use) == 0) {
-                stop(paste(reduction.use, "has not been run for this object yet."))
-        }
-        if (ncol(x = embeddings.use) < 3) {
-                stop(paste(reduction.use, "doesn't have the third dimension.
-                           Suggest performing RunTSNE(dim.embed = 3)"))
-        }
-        cells.use <- Seurat:::SetIfNull(x = cells.use, default = colnames(x = object@data))
-        dim.code <- GetDimReduction(object = object, reduction.type = reduction.use, 
-                                    slot = "key")
-        dim.codes <- paste0(dim.code, c(dim.1, dim.2))
-        data.plot <- as.data.frame(x = embeddings.use)
-        cells.use <- intersect(x = cells.use, y = rownames(x = data.plot))
-        data.plot <- data.plot[cells.use, dim.codes]
-        ident.use <- as.factor(x = object@ident[cells.use])
-        if (group.by != "ident") {
-                ident.use <- as.factor(x = FetchData(object = object, 
-                                                     vars.all = group.by)[cells.use, 1])
-        }
-        data.plot$ident <- ident.use
-        data.plot$x <- data.plot[, dim.codes[1]]
-        data.plot$y <- data.plot[, dim.codes[2]]
-        data.plot$z <- data.plot[, dim.codes[3]]
-        data.plot$pt.size <- pt.size
-        if (!is.null(plot.order)) {
-                if (any(!plot.order %in% data.plot$ident)) {
-                        stop("invalid ident in plot.order")
-                }
-                plot.order <- rev(c(plot.order, setdiff(unique(data.plot$ident), 
-                                                        plot.order)))
-                data.plot$ident <- factor(data.plot$ident, levels = plot.order)
-                data.plot <- data.plot[order(data.plot$ident), ]
-        }
-        rgl::open3d()
-        
-        car::scatter3d(x = data.plot$x, y = data.plot$y, z = data.plot$z)
-        
-        geom_point(mapping = aes(colour = factor(x = ident)), 
-                   size = pt.size)
-        if (!is.null(x = pt.shape)) {
-                shape.val <- FetchData(object = object, vars.all = pt.shape)[cells.use, 
-                                                                             1]
-                if (is.numeric(shape.val)) {
-                        shape.val <- cut(x = shape.val, breaks = 5)
-                }
-                data.plot[, "pt.shape"] <- shape.val
-                p <- ggplot(data = data.plot, mapping = aes(x = x, y = y)) + 
-                        geom_point(mapping = aes(colour = factor(x = ident), 
-                                                 shape = factor(x = pt.shape)), size = pt.size)
-        }
-        if (!is.null(x = cols.use)) {
-                p <- p + scale_colour_manual(values = cols.use)
-        }
-        p2 <- p + xlab(label = dim.codes[[1]]) + ylab(label = dim.codes[[2]]) + 
-                zlab(label = dim.codes[[3]]) +
-                scale_size(range = c(pt.size, pt.size))
-        p3 <- p2 + SetXAxisGG() + SetYAxisGG()  + SetLegendPointsGG(x = 6) + 
-                SetLegendTextGG(x = 12) + no.legend.title + theme_bw() + 
-                NoGrid()
-        p3 <- p3 + theme(legend.title = element_blank())
-        if (!is.null(plot.title)) {
-                p3 <- p3 + ggtitle(plot.title) + theme(plot.title = element_text(hjust = 0.5))
-        }
-        if (do.label) {
-                centers <- data.plot %>% dplyr::group_by(ident) %>% 
-                        summarize(x = median(x = x), y = median(x = y))
-                p3 <- p3 + geom_point(data = centers, mapping = aes(x = x, 
-                                                                    y = y), size = 0, alpha = 0) + 
-                        geom_text(data = centers,
-                                  mapping = aes(label = ident), size = label.size)
-        }
-        if (dark.theme) {
-                p <- p + DarkTheme()
-                p3 <- p3 + DarkTheme()
-        }
-        if (no.legend) {
-                p3 <- p3 + theme(legend.position = "none")
-        }
-        if (no.axes) {
-                p3 <- p3 + theme(axis.line = element_blank(), axis.text.x = element_blank(), 
-                                 axis.text.y = element_blank(), axis.ticks = element_blank(), 
-                                 axis.title.x = element_blank(), axis.title.y = element_blank(), 
-                                 panel.background = element_blank(), panel.border = element_blank(), 
-                                 panel.grid.major = element_blank(), panel.grid.minor = element_blank(), 
-                                 plot.background = element_blank())
-        }
-        if (do.identify || do.hover) {
-                if (do.bare) {
-                        plot.use <- p
-                }
-                else {
-                        plot.use <- p3
-                }
-                if (do.hover) {
-                        if (is.null(x = data.hover)) {
-                                features.info <- NULL
-                        }
-                        else {
-                                features.info <- FetchData(object = object, 
-                                                           vars.all = data.hover)
-                        }
-                        return(HoverLocator(plot = plot.use, data.plot = data.plot, 
-                                            features.info = features.info, dark.theme = dark.theme))
-                }
-                else if (do.identify) {
-                        return(FeatureLocator(plot = plot.use, data.plot = data.plot, 
-                                              dark.theme = dark.theme, ...))
-                }
-        }
-        if (do.return) {
-                if (do.bare) {
-                        return(p)
-                }
-                else {
-                        return(p3)
-                }
-        }
-        if (do.bare) {
-                print(p)
-        }
-        else {
-                print(p3)
-        }
-        }
-#=====Clean memory======================
-GC <- function()
-{
-        while (gc()[2, 4] != gc()[2, 4] | gc()[1, 4] != gc()[1,
-                                                             4]) {
-        }
 }
 
 
@@ -1365,7 +1615,149 @@ Types2Markers <- function(df, by = "Cell_Type"){
         return(List)
 }
 
-randomStrings <- function(n = 5000) {
-        a <- do.call(paste0, replicate(5, sample(LETTERS, n, TRUE), FALSE))
-        paste0(a, sprintf("%04d", sample(9999, n, TRUE)), sample(LETTERS, n, TRUE))
+
+TSNEPlot.1 <- function(object, do.label = FALSE, pt.size = 1, label.size = 4, 
+                       cells.use = NULL, colors.use = NULL, ...) 
+{
+        return(DimPlot.1(object = object, reduction.use = "tsne", 
+                         cells.use = cells.use, pt.size = pt.size, do.label = do.label, 
+                         label.size = label.size, cols.use = colors.use, ...))
 }
+
+# find and print differentially expressed genes across conditions ================
+# combine SetIdent,indMarkers and avg_UMI
+
+TSNEPlot.3D <- function (object, reduction.use = "tsne", dim.1 = 1, dim.2 = 2, dim.3 = 3,
+                         cells.use = NULL, pt.size = 1, do.return = FALSE, do.bare = FALSE, 
+                         cols.use = NULL, group.by = "ident", pt.shape = NULL, do.hover = FALSE, 
+                         data.hover = "ident", do.identify = FALSE, do.label = FALSE, 
+                         label.size = 4, no.legend = FALSE, no.axes = FALSE, dark.theme = FALSE, 
+                         plot.order = NULL, plot.title = NULL, ...) 
+{
+        embeddings.use = GetDimReduction(object = object, reduction.type = reduction.use, 
+                                         slot = "cell.embeddings")
+        if (length(x = embeddings.use) == 0) {
+                stop(paste(reduction.use, "has not been run for this object yet."))
+        }
+        if (ncol(x = embeddings.use) < 3) {
+                stop(paste(reduction.use, "doesn't have the third dimension.
+                           Suggest performing RunTSNE(dim.embed = 3)"))
+        }
+        cells.use <- Seurat:::SetIfNull(x = cells.use, default = colnames(x = object@data))
+        dim.code <- GetDimReduction(object = object, reduction.type = reduction.use, 
+                                    slot = "key")
+        dim.codes <- paste0(dim.code, c(dim.1, dim.2))
+        data.plot <- as.data.frame(x = embeddings.use)
+        cells.use <- intersect(x = cells.use, y = rownames(x = data.plot))
+        data.plot <- data.plot[cells.use, dim.codes]
+        ident.use <- as.factor(x = object@ident[cells.use])
+        if (group.by != "ident") {
+                ident.use <- as.factor(x = FetchData(object = object, 
+                                                     vars.all = group.by)[cells.use, 1])
+        }
+        data.plot$ident <- ident.use
+        data.plot$x <- data.plot[, dim.codes[1]]
+        data.plot$y <- data.plot[, dim.codes[2]]
+        data.plot$z <- data.plot[, dim.codes[3]]
+        data.plot$pt.size <- pt.size
+        if (!is.null(plot.order)) {
+                if (any(!plot.order %in% data.plot$ident)) {
+                        stop("invalid ident in plot.order")
+                }
+                plot.order <- rev(c(plot.order, setdiff(unique(data.plot$ident), 
+                                                        plot.order)))
+                data.plot$ident <- factor(data.plot$ident, levels = plot.order)
+                data.plot <- data.plot[order(data.plot$ident), ]
+        }
+        rgl::open3d()
+        
+        car::scatter3d(x = data.plot$x, y = data.plot$y, z = data.plot$z)
+        
+        geom_point(mapping = aes(colour = factor(x = ident)), 
+                   size = pt.size)
+        if (!is.null(x = pt.shape)) {
+                shape.val <- FetchData(object = object, vars.all = pt.shape)[cells.use, 
+                                                                             1]
+                if (is.numeric(shape.val)) {
+                        shape.val <- cut(x = shape.val, breaks = 5)
+                }
+                data.plot[, "pt.shape"] <- shape.val
+                p <- ggplot(data = data.plot, mapping = aes(x = x, y = y)) + 
+                        geom_point(mapping = aes(colour = factor(x = ident), 
+                                                 shape = factor(x = pt.shape)), size = pt.size)
+        }
+        if (!is.null(x = cols.use)) {
+                p <- p + scale_colour_manual(values = cols.use)
+        }
+        p2 <- p + xlab(label = dim.codes[[1]]) + ylab(label = dim.codes[[2]]) + 
+                zlab(label = dim.codes[[3]]) +
+                scale_size(range = c(pt.size, pt.size))
+        p3 <- p2 + Seurat:::SetXAxisGG() + Seurat:::SetYAxisGG()  + 
+                Seurat:::SetLegendPointsGG(x = 6) + 
+                Seurat:::SetLegendTextGG(x = 12) + no.legend.title + theme_bw() + 
+                Seurat:::NoGrid()
+        p3 <- p3 + theme(legend.title = element_blank())
+        if (!is.null(plot.title)) {
+                p3 <- p3 + ggtitle(plot.title) + theme(plot.title = element_text(hjust = 0.5))
+        }
+        if (do.label) {
+                centers <- data.plot %>% dplyr::group_by(ident) %>% 
+                        summarize(x = median(x = x), y = median(x = y))
+                p3 <- p3 + geom_point(data = centers, mapping = aes(x = x, 
+                                                                    y = y), size = 0, alpha = 0) + 
+                        geom_text(data = centers,
+                                  mapping = aes(label = ident), size = label.size)
+        }
+        if (dark.theme) {
+                p <- p + DarkTheme()
+                p3 <- p3 + DarkTheme()
+        }
+        if (no.legend) {
+                p3 <- p3 + theme(legend.position = "none")
+        }
+        if (no.axes) {
+                p3 <- p3 + theme(axis.line = element_blank(), axis.text.x = element_blank(), 
+                                 axis.text.y = element_blank(), axis.ticks = element_blank(), 
+                                 axis.title.x = element_blank(), axis.title.y = element_blank(), 
+                                 panel.background = element_blank(), panel.border = element_blank(), 
+                                 panel.grid.major = element_blank(), panel.grid.minor = element_blank(), 
+                                 plot.background = element_blank())
+        }
+        if (do.identify || do.hover) {
+                if (do.bare) {
+                        plot.use <- p
+                }
+                else {
+                        plot.use <- p3
+                }
+                if (do.hover) {
+                        if (is.null(x = data.hover)) {
+                                features.info <- NULL
+                        }
+                        else {
+                                features.info <- FetchData(object = object, 
+                                                           vars.all = data.hover)
+                        }
+                        return(HoverLocator(plot = plot.use, data.plot = data.plot, 
+                                            features.info = features.info, dark.theme = dark.theme))
+                }
+                else if (do.identify) {
+                        return(FeatureLocator(plot = plot.use, data.plot = data.plot, 
+                                              dark.theme = dark.theme, ...))
+                }
+        }
+        if (do.return) {
+                if (do.bare) {
+                        return(p)
+                }
+                else {
+                        return(p3)
+                }
+        }
+        if (do.bare) {
+                print(p)
+        }
+        else {
+                print(p3)
+        }
+        }

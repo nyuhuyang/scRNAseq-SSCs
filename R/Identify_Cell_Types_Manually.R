@@ -3,10 +3,10 @@ library(dplyr)
 source("./R/Seurat_functions.R")
 
 #====== 2.1 identify phenotype for each cluster  ==========================================
-lnames = load(file = "./data/SSCs_alignment_8.Rda")
+lnames = load(file = "./data/SSCs_alignment.Rda")
 lnames
 
-BlackAndWhiteFeatureplot <- function(x,object = SSCs,...){
+Featureplot <- function(x,object = SSCs,...){
     p <- FeaturePlot(object = object, 
                      reduction.use = "tsne",
                      features.plot = x, min.cutoff = NA, 
@@ -136,13 +136,14 @@ CellCycle <- MouseGenes(SSCs,c("CCND1","CCND2","CCND3","CDK4","CDK6","PCNA","SOX
 uSSCs_As_only <- MouseGenes(SSCs,c("ID4","PAX7","BMI1","EOMES","GFRA1","FGFR3"))# As undifferentiated spermatogonia only
 uSSCs_As_pr_al4 <- MouseGenes(SSCs,c("NANOS2","UTF1","ZBTB16","SALL4","LIN28A",
                                      "FOXO1","DPPA4","UCHL1","UTF1"),unique = T)# expression  As, Apr and Aal4
-uSSCs <- unique(c(uSSCs_As_only,uSSCs_As_pr_al4))
+uSSCs <- unique(c(uSSCs_As_only,uSSCs_As_pr_al4,u_di_SSCs,other_SSCs))
 u_di_SSCs <- MouseGenes(SSCs,c("NEUROG3","NANOS3","SOHLH1","MAGEA4","KIT","CD9"),unique = T) # un/differentiated
 other_SSCs <- MouseGenes(SSCs,c("EXOSC10","SLC22A2","DMRT1","MKI67", "SSX2B","SSX3","SSX4",
                                 "ITGA6","NANOG","CD9", "EpCAM","ADGRA3","GDNF","ITGB1","Ret","HLA-A",
                                 "DDX4","DAZL","STRA8","CD24A","Nanos3","EGR3","FHL1","SOX3",
                                 "TAF4B","Bcl6b","Numb","Lrp4","SOHLH2","CDH1","GNL3","UTF1","CST3","Vim",
                                 "CENPB","NGN3","PRDX5","LRRC6","Rps27a"),unique = T) 
+Sertoli <- MouseGenes(SSCs,c("TF","TFRC","TFR2"))
 # ZBTB16(PLZF), SLC22A2(OCT2),MKI67(Ki67), ITGA6(α6-integrin,CD49f)
 # THY1(CD90), ADGRA3(GPR125), ITGB1(β1-integrin, CD29),Ret(c-ret), VASA(DDX4)
 # SERPINC1(EE2 antigen),Pou5f1(Oct4),EGR3,FHL1(RBM),GNL3(Nucleostemin)
@@ -151,8 +152,15 @@ spermatozoids <- MouseGenes(SSCs,c("THY1","STRC","DEL15Q15.3","DAZ1","DAZ2","DAZ
 defective_spermatozoa <- MouseGenes(SSCs,c("TXNDC8","TXNDC2","ALOX15","NME8")) #TXNDC8(SPTRX3), ALOX15(15-LOX)
 
 # 
-
-
+test <- MouseGenes(SSCs,c("ZBTB16")) #TXNDC8(SPTRX3), ALOX15(15-LOX)
+Featureplot <- function(x,object = SSCs,...){
+        p <- FeaturePlot(object = object, 
+                         reduction.use = "tsne",
+                         features.plot = x, min.cutoff = NA, 
+                         cols.use = c("lightgrey","blue"), pt.size = 0.5,...)
+        return(p)
+}
+Featureplot(test)
 #  test FindAllMarkers=============
 AllMarkers <- FindAllMarkers.UMI(SSCs, logfc.threshold = 0.25,
                                  min.pct = 0.25,only.pos = T)
@@ -286,45 +294,46 @@ markers.to.plot <- MouseGenes(SSCs,markers.to.plot,unique=T)
 table(SSCs@ident)
 idents <- as.data.frame(table(SSCs@ident))
 old.ident.ids <- idents$Var1
-new.cluster.ids <- c("Other stem cells 0",
-                     "Spermatogonial stem cells 1",
-                     "Spermatogonial stem cells 2",
-                     "Defective sperm 3",
-                     "Collagen 4",
-                     "Spermatocyte 5",
-                     "Spermatocyte 6",
-                     "Spermatocyte 7",
-                     "Defective sperm 8",
-                     "Spermatocyte 9",
-                     "Defective sperm 10",
-                     "Spermatogonial stem cells 11",
-                     "Spermatocyte 12",
-                     "Spermatocyte 13",
-                     "Defective sperm 14",
-                     "Spermatocyte 15",
-                     "Spermatocyte 16",
-                     "Other stem cells 17",
-                     "Defective sperm 18",
-                     "Defective sperm 19",
-                     "unknown 20",
-                     "Spermatocyte 21",
-                     "Defective sperm 22",
-                     "Spermatocyte 23",
-                     "White blood cells 24",
-                     "Other stem cells 25",
-                     "Defective sperm 26",
-                     "Other stem cells 27",
-                     "Defective sperm 28",
-                     "White blood cells 29",
-                     "Spermatogonial stem cells 30",
-                     "Defective sperm 31",
-                     "unknown 32",
-                     "White blood cells 33",
-                     "unknown 34")
+new.cluster.ids <- c("Sertoli cells 0",
+                     "Spermatogonia 1",
+                     "Spermatogonia/\nSpermatocytes 2",
+                     "Spermatids 3",
+                     "Unkonwn cells 4",
+                     "Spermatocytes 5",
+                     "Spermatocytes 6",
+                     "Spermatocytes 7",
+                     "Spermatids 8",
+                     "Spermatocytes 9",
+                     "Spermatids/\nRound spermatids 10",
+                     "Spermatogonia 11",
+                     "Spermatocytes 12",
+                     "Spermatocytes 13",
+                     "Spermatids 14",
+                     "Spermatocytes 15",
+                     "Spermatocytes 16",
+                     "Spermatogonia 17",
+                     "Spermatids 18",
+                     "Round spermatids 19",
+                     "Spermatocytes 20",
+                     "Spermatocytes 21",
+                     "Spermatids 22",
+                     "Spermatocytes 23",
+                     "Peritubular/\n epithelial cells/\n white blood cells 24",
+                     "Spermatogonia 25",
+                     "Spermatocytes 26",
+                     "Spermatogonia 27",
+                     "Spermatids 28",
+                     "Peritubular/\n epithelial cells/\n white blood cells 29",
+                     "Spermatogonia 30",
+                     "Spermatocytes 31",
+                     "Peritubular/\n epithelial cells/\n white blood cells 32",
+                     "Peritubular/\n epithelial cells/\n white blood cells 33",
+                     "Sertoli cells 34")
 
 SSCs@ident <- plyr::mapvalues(x = SSCs@ident,
                                     from = old.ident.ids,
                                     to = new.cluster.ids)
+
 DotPlot(SSCs, genes.plot = rev(markers.to.plot),
         cols.use = c("blue","red"), x.lab.rot = T, plot.legend = T,
         dot.scale = 8, do.return = T)
@@ -336,41 +345,42 @@ lnames
 table(SSCs@ident)
 idents <- as.data.frame(table(SSCs@ident))
 old.ident.ids <- idents$Var1
-new.cluster.ids <- c("Other stem cells",
-                     "Spermatogonial stem cells",
-                     "Spermatogonial stem cells",
-                     "Defective sperm",
-                     "Collagen",
-                     "Spermatocyte",
-                     "Spermatocyte",
-                     "Spermatocyte",
-                     "Defective sperm",
-                     "Spermatocyte",
-                     "Defective sperm",
-                     "Spermatogonial stem cells",
-                     "Spermatocyte",
-                     "Spermatocyte",
-                     "Defective sperm",
-                     "Spermatocyte",
-                     "Spermatocyte",
-                     "Other stem cells",
-                     "Defective sperm",
-                     "Defective sperm",
-                     "unknown",
-                     "Spermatocyte",
-                     "Defective sperm",
-                     "Spermatocyte",
-                     "White blood cells",
-                     "Other stem cells",
-                     "Defective sperm",
-                     "Other stem cells",
-                     "Defective sperm",
-                     "White blood cells",
-                     "Spermatogonial stem cells",
-                     "Defective sperm",
-                     "unknown",
-                     "White blood cells",
-                     "unknown")
+new.cluster.ids <- c("Sertoli cells",
+                     "Spermatogonia",
+                     "Spermatogonia/\nSpermatocytes",
+                     "Spermatids",
+                     "Unkonwn cells",
+                     "Spermatocytes",
+                     "Spermatocytes",
+                     "Spermatocytes",
+                     "Spermatids",
+                     "Spermatocytes",
+                     "Spermatids/\nRound spermatids",
+                     "Spermatogonia",
+                     "Spermatocytes",
+                     "Spermatocytes",
+                     "Spermatids",
+                     "Spermatocytes",
+                     "Spermatocytes",
+                     "Spermatogonia",
+                     "Spermatids",
+                     "Round spermatids",
+                     "Spermatocytes",
+                     "Spermatocytes",
+                     "Spermatids",
+                     "Spermatocytes",
+                     "Peritubular/\n epithelial cells/\n white blood cells",
+                     "Spermatogonia",
+                     "Spermatocytes",
+                     "Spermatogonia",
+                     "Spermatids",
+                     "Peritubular/\n epithelial cells/\n white blood cells",
+                     "Spermatogonia",
+                     "Spermatocytes",
+                     "Peritubular/\n epithelial cells/\n white blood cells",
+                     "Peritubular/\n epithelial cells/\n white blood cells",
+                     "Sertoli cells")
+
 
 SSCs@ident <- plyr::mapvalues(x = SSCs@ident,
                                     from = old.ident.ids,
@@ -383,12 +393,12 @@ p2 <- TSNEPlot(SSCs, do.return = T, pt.size = 1, group.by = "ident")
 #png('./output/TSNESplot_alignment.png')
 plot_grid(p1, p2)
 
-TSNEPlot(object = SSCs, no.legend = T, do.label = T,
+TSNEPlot(object = SSCs, no.legend = T, do.label = F,
          do.return = TRUE, label.size = 5)+
-        ggtitle("TSNE plot of major cell types")+
+        ggtitle("All samples")+
         theme(text = element_text(size=20),     #larger text including legend title							
-              plot.title = element_text(hjust = 0.5)) #title in middle
-
+              plot.title = element_text(hjust = 0.5))+ #title in middle
+        ggrepel::geom_label_repel(aes(label = ident))
 SpermatogonialSC <- SubsetData(SSCs,ident.use = "Spermatogonial stem cells")
 SpermatogonialSC_cells <- as.data.frame(table(SpermatogonialSC@meta.data$orig.ident))
 All_cells <- as.data.frame(table(SSCs@meta.data$orig.ident))
@@ -398,8 +408,8 @@ SpermatogonialSC_cells
 
 # FeatureHeatmap
 SSCs@meta.data$orig.ident <- gsub("Ad-","zAd-",SSCs@meta.data$orig.ident)
-x <- FeatureHeatmap(object = SSCs, features.plot = c("Txndc8","Spag16",
-                                                     "Gfra1","Dmrt1"),
+x <- FeatureHeatmap(object = SSCs, features.plot = c("Wt1","Gfra1","Zbtb16",
+                                                    "Sycp3", "Txndc8"),
                     group.by = "orig.ident", sep.scale = T, pt.size = 0.5, 
                     cols.use = c("gray98", "red"), pch.use = 20, do.return = T)
 
@@ -444,3 +454,114 @@ ggplot(new_percentbyIdents, aes(x = samples, y = value, color = Gene.name)) +
                shape = guide_legend(override.aes = list(size=10))) #larger legend diagram 
 
 
+######################
+# Cell Type Marker gene database
+lnames = load(file = "./data/SSCs_alignment_8.Rda")
+lnames
+SSCs_8 <- SSCs
+remove(SSCs)
+GC()
+lnames = load(file = "./data/SSCs_alignment.Rda")
+lnames
+SingleFeaturePlot.1(object = SSCs, "Wt1", threshold = 1.5)
+SingleFeaturePlot.1(object = SSCs, "Ar", threshold = 0.1)
+SingleFeaturePlot.1(object = SSCs, "Acta2", threshold = 1)
+SingleFeaturePlot.1(object = SSCs, "Vcam1")
+SingleFeaturePlot.1(object = SSCs, "Laptm5")
+SingleFeaturePlot.1(object = SSCs, "Vim", threshold = 0.1)
+SingleFeaturePlot.1(object = SSCs, "Zbtb16", threshold = 0.5)
+SingleFeaturePlot.1(object = SSCs, "Sycp3", threshold = 1.5)
+SingleFeaturePlot.1(object = SSCs, "Acrv1", threshold = 1.5)
+SingleFeaturePlot.1(object = SSCs, "Txndc8", threshold = 1.5)
+SingleFeaturePlot.1(object = SSCs, "Hbb-bt", threshold = 1.5)
+SingleFeaturePlot.1(object = SSCs, "Prm2", threshold = 1.5)
+SingleFeaturePlot.1(object = SSCs, "Sall4", threshold = 1)
+SingleFeaturePlot.1(object = SSCs, "Gfra1", threshold = 0.1)
+SingleFeaturePlot.1(object = SSCs, "Dmrt1", threshold = 0.1)
+SingleFeaturePlot.1(object = SSCs, "Id4", threshold = 1)
+SingleFeaturePlot.1(object = SSCs, "Sall4", threshold = 0.1)
+SingleFeaturePlot.1(object = SSCs, "Acta2", threshold = 1)
+unknown <- FeaturePlot(object = SSCs, "Sall4",do.identify = T)
+unknowns <- SubsetData(SSCs_8,cells.use = unknown)
+table(unknowns@ident)
+# rename
+table(SSCs@ident)
+idents <- as.data.frame(table(SSCs@ident))
+old.ident.ids <- idents$Var1
+new.cluster.ids <- c("Spermatogonia",
+                     "Sertoli cells",
+                     "Spermatogonia",
+                     "Spermatids",
+                     "Spermatocytes",
+                     "Spermatocytes",
+                     "Sertoli cells",
+                     "Spermatocytes",
+                     "Spermatocytes",
+                     "Spermatocytes",
+                     "Spermatids",
+                     "Spermatocytes",
+                     "Smooth Muscle",
+                     "Spermatids",
+                     "Peritubular/\n epithelial cells/\n white blood cells",
+                     "Round spermatids",
+                     "Spermatogonia",
+                     "Spermatocytes",
+                     "Spermatocytes",
+                     "Spermatids",
+                     "Spermatids",
+                     "Peritubular/\n epithelial cells/\n white blood cells",
+                     "Round spermatids",
+                     "Spermatogonia",
+                     "Spermatogonia",
+                     "Peritubular/\n epithelial cells/\n white blood cells",
+                     "Red blood cells",
+                     "Sertoli cells",
+                     "Spermatids",
+                     "Spermatocytes",
+                     "Peritubular/\n epithelial cells/\n white blood cells",
+                     "Peritubular/\n epithelial cells/\n white blood cells",
+                     "Spermatogonia",
+                     "Peritubular/\n epithelial cells/\n white blood cells")
+
+SSCs@ident <- plyr::mapvalues(x = SSCs@ident,
+                              from = old.ident.ids,
+                              to = new.cluster.ids)
+
+TSNEPlot.1(object = SSCs,do.label = T, group.by = "ident", 
+           do.return = TRUE, no.legend = T,
+           pt.size = 1,label.size = 8 )+
+        ggtitle("All samples")+
+        theme(text = element_text(size=15),     #larger text including legend title							
+              plot.title = element_text(hjust = 0.5,size = 25, face = "bold")) 
+
+# rename cells manually
+Spermatogonia <- FeaturePlot(object = SSCs, "Zbtb16",do.identify = T,pt.size = 2)
+Spermatocytes <- FeaturePlot(object = SSCs, "Sycp3",do.identify = T,pt.size = 2)
+wbc <- FeaturePlot(object = SSCs, "Laptm5",do.identify = T,pt.size = 2)
+Rbc <- FeaturePlot(object = SSCs, "Hbb-bt",do.identify = T,pt.size = 2)
+Spermatids <- FeaturePlot(object = SSCs, "Acrv1",do.identify = T,pt.size = 2)
+
+SSCs <- RenameIdent.1(SSCs, new.ident.name = "Spermatogonia",
+                      cells.use = Spermatogonia) 
+SSCs <- RenameIdent.1(SSCs, new.ident.name = "Spermatocytes",
+                      cells.use = Spermatocytes)
+SSCs <- RenameIdent.1(SSCs, new.ident.name = "Peritubular/\n epithelial cells/\n white blood cells",
+                      cells.use = wbc) 
+SSCs <- RenameIdent.1(SSCs, new.ident.name = "Red blood cells",
+                      cells.use = Rbc) 
+SSCs <- RenameIdent.1(SSCs, new.ident.name = "Spermatids",
+                      cells.use = Spermatids) 
+SSCs <- RenameIdent(SSCs, old.ident.name = "Peritubular/\n epithelial cells/\n white blood cells",
+                    new.ident.name = "Peritubular/\nepithelial cells/\nwhite blood cells") 
+
+TSNEPlot(object = SSCs,do.label = F, group.by = "ident", 
+           do.return = TRUE, no.legend = T,
+           pt.size = 1,label.size = 8 )+
+        ggtitle("All samples")+
+        theme(text = element_text(size=20),     #larger text including legend title							
+              plot.title = element_text(hjust = 0.5))
+
+kable(table(SSCs@ident, SSCs@meta.data$orig.ident)) %>%
+kable_styling()
+
+save(SSCs, file = "./data/SSCs_label.Rda")

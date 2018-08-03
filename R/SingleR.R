@@ -10,6 +10,7 @@ lnames = load(file = "./data/SSCs_label.Rda")
 lnames
 lname = load(file='./data/GeneSets/GSE43717_GSE83264.RData') 
 lname
+SSCs@meta.data$orig.ident = gsub("PND18pre","PND18",SSCs@meta.data$orig.ident)
 ref_GSE43717_GSE83264$name
 length(ref_GSE43717_GSE83264$types)
 length(unique(ref_GSE43717_GSE83264$types))
@@ -33,7 +34,7 @@ singler$meta.data$clusters = SSCs@ident # the Seurat clusters (if 'clusters' not
 save(singler,file="./output/singler_SSCs.RData")
 #====== 3.2 SingleR specifications ==========================================
 # Step 1: Spearman coefficient
-lnames = load(file = "./output/singler_GSE43717_GSE83264.RData")
+lnames = load(file = "./output/singler_SSCs.RData")
 lnames
 singler$seurat = SSCs # (optional)
 SingleR.DrawScatter(sc_data = singler$seurat@data,cell_id = 10, 
@@ -84,14 +85,16 @@ output[[2]]
 
 #Finally, we can also view the labeling as a table compared to the original identities:
 
+# cell number
 kable(table(singler$singler[[1]]$SingleR.single.main$labels,
             singler$meta.data$orig.ident)) %>%
         kable_styling()
-kable(table(singler$meta.data$orig.ident,
-            singler$singler[[1]]$SingleR.single.main$labels)) %>%
-        kable_styling()
-kable(table(singler$meta.data$orig.ident,singler$seurat@ident)) %>%
-        kable_styling()
+# cell percentage
+prop.table(x = table(singler$singler[[1]]$SingleR.single.main$labels,
+                     SSCs@meta.data$orig.ident),margin = 2) %>%
+        kable  %>% kable_styling()
+# total cell number
+table(singler$meta.data$orig.ident) %>% t() %>% kable() %>% kable_styling()
 
 # Rename ident
 table(names(SSCs@ident) == rownames(singler$singler[[1]]$SingleR.single.main$labels))

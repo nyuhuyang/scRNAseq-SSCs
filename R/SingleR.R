@@ -34,7 +34,7 @@ singler$meta.data$clusters = SSCs@ident # the Seurat clusters (if 'clusters' not
 save(singler,file="./output/singler_SSCs.RData")
 #====== 3.2 SingleR specifications ==========================================
 # Step 1: Spearman coefficient
-lnames = load(file = "./output/singler_SSCs.RData")
+lnames = load(file = "./output/singler_Ref_GSE43717.RData")
 lnames
 singler$seurat = SSCs # (optional)
 SingleR.DrawScatter(sc_data = singler$seurat@data,cell_id = 10, 
@@ -72,16 +72,9 @@ out = SingleR.PlotTsne.1(singler$singler[[1]]$SingleR.single.main,
                          do.letters = F,labels = singler$singler[[1]]$SingleR.single.main$labels,
                          label.size = 5, dot.size = 1,do.legend = F,alpha = 1,
                          label.repel = T,force=2)
-out$p+  ggtitle("Supervised cell type labeling by GSE43717 and GSE83264")+#ggplot title
+out$p+  ggtitle("Supervised cell type labeling by immgen and GSE43717")+#ggplot title
         theme(text = element_text(size=20),     #larger text including legend title
               plot.title = element_text(hjust = 0.5,size = 18, face = "bold")) #title in middle
-
-output <- SplitSingleR.PlotTsne(singler = singler, split.by = "conditions",
-                              return.plots=T,do.label=T,do.legend = F,alpha = 1,
-                              label.repel = F, force=2)
-output[[1]]
-output[[2]]
-
 
 #Finally, we can also view the labeling as a table compared to the original identities:
 
@@ -104,24 +97,10 @@ names(ident.use) = rownames(singler$singler[[1]]$SingleR.single.main$labels)
 SSCs@ident <- ident.use
 
 TSNEPlot(object = SSCs,do.label = F, group.by = "ident", 
-         do.return = TRUE, no.legend = T,
+         do.return = TRUE, no.legend = F,
          pt.size = 1,label.size = 8 )+
-        ggtitle("Supervised cell type labeling by GSE43717 and GSE83264")+
+        ggtitle("Supervised cell type labeling by GSE43717")+
         theme(text = element_text(size=20),     #larger text including legend title							
               plot.title = element_text(hjust = 0.5))
 
-save(SSCs, file = "./data/SSCs_suplabel.Rda")
-
-cells_prop <- as.data.frame(table(singler$singler[[1]]$SingleR.single$labels,
-                                              singler$meta.data$orig.ident))
-cells_prop <- dcast(cells_prop,Var2~Var1)
-rownames(cells_prop) = cells_prop$Var2
-cells_prop <- cells_prop[,-1]
-total  <- colSums(cells_prop)
-Cells_prop <- cells_prop/total
-Cells_prop %>% kable %>% kable_styling()
-
-All_cells <- as.data.frame(table(SSCs@meta.data$orig.ident))
-SpermatogonialSC_cells$total <- All_cells$Freq
-SpermatogonialSC_cells$percentage <- SpermatogonialSC_cells$Freq/SpermatogonialSC_cells$total
-SpermatogonialSC_cells
+save(SSCs, file = "./data/SSCs_suplabel_GSE43717.Rda")

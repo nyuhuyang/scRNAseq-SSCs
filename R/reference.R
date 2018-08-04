@@ -139,7 +139,7 @@ ref_GSE83264 = CreateSinglerReference(name = "GSE83264",
 save(ref_GSE83264,file='./data/GeneSets/GSE83264/ref_GSE83264.RData') # it is best to name the object and the file with the same name.
 
 ################################################
-# merge hpca_blueprint_encode GSE43717 and GSE83264
+# merge Immgene mouse.RNAseq GSE43717 and GSE83264
 ################################################
 # load hpca_blueprint_encode reference database
 Iname = load(file='../SingleR/data/ref_Mouse.RData');Iname
@@ -190,3 +190,28 @@ ref_GSE43717_GSE83264 = CreateSinglerReference(name = "GSE43717_GSE83264",
                                            main_types = c(ref_GSE43717$main_types,ref_GSE83264$main_types))
 
 save(ref_GSE43717_GSE83264,file='./data/GeneSets/GSE43717_GSE83264.RData') # it is best to name the object and the file with the same name.
+
+################################################
+# merge Immgene GSE43717
+################################################
+# load Immgene reference database
+Iname = load(file='../SingleR/data/ref_Mouse.RData');Iname
+Iname = load(file='./data/GeneSets/GSE43717/ref_GSE43717.RData');Iname
+
+Ref_GSE43717 <- merge(ref_immgen_mouse.rnaseq$data, ref_GSE43717$data, by='row.names')
+rownames(Ref_GSE43717) = Ref_GSE43717$Row.names
+Ref_GSE43717 = Ref_GSE43717[,-1]
+
+dim(Ref_GSE43717)
+testMMM(Ref_GSE43717)
+boxplot(Ref_GSE43717) # too slow!!
+
+types = c(ref_immgen_mouse.rnaseq$types,ref_GSE43717$types)
+main_types = c(ref_immgen_mouse.rnaseq$main_types,ref_GSE43717$main_types)
+
+Ref_GSE43717 = CreateSinglerReference(name = "immgen_mouse.rnaseq_GSE43717",
+                                               expr = as.matrix(Ref_GSE43717),
+                                               types = types, 
+                                               main_types = main_types)
+
+save(Ref_GSE43717,file='./data/GeneSets/Ref_GSE43717.RData') # it is best to name the object and the file with the same name.

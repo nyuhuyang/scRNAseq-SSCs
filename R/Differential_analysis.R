@@ -16,11 +16,12 @@ source("../R/Seurat_functions.R")
 #It will also be interesting to check if there is some subtype enriched in young compared to aged or viceversa. 
 
 # 4.1.1 load data
-# Keep Spermatogonia cells only
-lnames = load(file = "./data/SSCs_suplabel.Rda")
+lnames = load(file = "./data/SSCs_suplabel_GSE43717.Rda")
 lnames
 table(SSCs@ident)
 table(SSCs@ident,SSCs@meta.data$orig.ident) %>% kable() %>%  kable_styling()
+Spermatogonia = SubsetData(SSCs,ident.use = "Spermatogonia")
+Spermatocytes = SubsetData(SSCs,ident.use = "Spermatocytes")
 
 "IS A DAY 6 GFRA1-POSITIVE SPERMATOGONIUM THE SAME AS A DAY 18 GFRA1-POSITIVE SPERMATOGONIUM?"
 "IS A DAY 14 SYCP3-POSITIVE SPERMATOCYTE THE SAME AS AN ADULTSYCP3-POSITIVE SPERMATOCYTE?"
@@ -40,17 +41,14 @@ Spermatocytes_markers = All_markers[All_markers$cluster == "Spermatocytes",]
 kable(Spermatocytes_markers[1:20,]) %>% kable_styling()
 write.csv(Spermatocytes_markers,"./output/Spermatocytes_markers.csv")
 
-SingleFeaturePlot.1(object = SSCs, "Gm26870", threshold = 1.5)
-
 # Step 2. find DE genes among different day==============
-Spermatogonia = SubsetData(SSCs,ident.use = "Spermatogonia")
-Spermatocytes = SubsetData(SSCs,ident.use = "Spermatocytes")
 # replace ident with orig.ident
 
 Spermatogonia@meta.data$orig.ident = gsub("Ad-","zAd-",Spermatogonia@meta.data$orig.ident)
 ident.vector <- as.factor(Spermatogonia@meta.data$orig.ident)
 names(x = ident.vector) <- names(Spermatogonia@ident)
 Spermatogonia@ident = ident.vector
+Spermatogonia = SubsetData(Spermatogonia, ident.remove = "PND25")
 
 Spermatocytes@meta.data$orig.ident = gsub("Ad-","zAd-",Spermatocytes@meta.data$orig.ident)
 ident.vector <- as.factor(Spermatocytes@meta.data$orig.ident)
@@ -64,13 +62,13 @@ TSNEPlot(object = Spermatocytes,do.label = F, group.by = "ident",
         theme(text = element_text(size=20),     #larger text including legend title							
               plot.title = element_text(hjust = 0.5,size = 25, face = "bold")) 
 
-Spermatogonia_develop <- FindAllMarkers.UMI(Spermatogonia,only.pos = T)
+Spermatogonia_develop <- FindAllMarkers.UMI(Spermatogonia)
 rownames(Spermatogonia_develop) =NULL
 Spermatogonia_develop <- Spermatogonia_develop %>% select("gene", everything()) # Moving the last column to the start
 kable(Spermatogonia_develop[1:20,]) %>% kable_styling()
-write.csv(Spermatogonia_develop,"./output/Spermatogonia_develop.csv")
+write.csv(Spermatogonia_develop,"./output/Spermatogonia_develop_new.csv")
 
-Spermatocytes_develop <- FindAllMarkers.UMI(Spermatocytes,only.pos = T)
+Spermatocytes_develop <- FindAllMarkers.UMI(Spermatocytes)
 rownames(Spermatocytes_develop) =NULL
 Spermatocytes_develop <- Spermatocytes_develop %>% select("gene", everything()) # Moving the last column to the start
 kable(Spermatocytes_develop[1:20,]) %>% kable_styling()
@@ -81,46 +79,32 @@ Spermatogonia_develop = read.csv("./output/Spermatogonia_develop.csv", header = 
 kable(Spermatogonia_develop[1:20,]) %>% kable_styling()
 Spermatocytes_develop = read.csv("./output/Spermatocytes_develop.csv", header = TRUE)
 kable(Spermatocytes_develop[1:20,]) %>% kable_styling()
+Spermatogonia_markers = read.csv("./output/Spermatogonia_markers.csv", header = TRUE)
+kable(Spermatogonia_markers[1:20,]) %>% kable_styling()
+Spermatocytes_markers = read.csv("./output/Spermatocytes_markers.csv", header = TRUE)
+kable(Spermatocytes_markers[1:20,]) %>% kable_styling()
 
 # Spermatogonia
 table(Spermatogonia_develop$gene %in% Spermatogonia_markers$gene)
 Spermatogonia_dev_mark <- Spermatogonia_develop[Spermatogonia_develop$gene %in%
                                                         Spermatogonia_markers$gene,]
-kable(Spermatogonia_dev_mark[1:20,-1]) %>% kable_styling()
+kable(Spermatogonia_dev_mark[1:20,]) %>% kable_styling()
 top3 <- Spermatogonia_dev_mark %>% group_by(cluster) %>% top_n(3, avg_logFC) 
-as.data.frame(top3) %>% kable() %>% kable_styling()
-write.csv(Spermatogonia_dev_mark[,-1],"./output/Spermatogonia_dev_mark.csv")
-# FeatureHeatmap
-Spermatogonia@meta.data$orig.ident <- gsub("Ad-","zAd-",Spermatogonia@meta.data$orig.ident)
-x <- FeatureHeatmap(object = Spermatogonia, 
-                    features.plot = c("Ccnd2","Gm26870","Hist1h2ap","Gfra1","Sycp3"),
-                    group.by = "orig.ident", sep.scale = T, pt.size = 0.5, 
-                    cols.use = c("gray98", "red"), pch.use = 20, do.return = T)
-
-x$data <- x$data[order(x$data$expression),]
-customize_Seurat_FeatureHeatmap(x, alpha.use = 0.8,
-                                scaled.expression.threshold = 1,
-                                gradient.use = c("orangered", "red4"))
+top3 %>% kable() %>% kable_styling()
+write.csv(Spermatogonia_dev_mark,"./output/Spermatogonia_dev_mark_new.csv")
 
 # Spermatocytes
 table(Spermatocytes_develop$gene %in% Spermatocytes_markers$gene)
 Spermatocytes_dev_mark <- Spermatocytes_develop[Spermatocytes_develop$gene %in%
                                                         Spermatocytes_markers$gene,]
-kable(Spermatocytes_dev_mark[1:20,-1]) %>% kable_styling()
+kable(Spermatocytes_dev_mark[1:20,]) %>% kable_styling()
 top3 <- Spermatocytes_dev_mark %>% group_by(cluster) %>% top_n(3, avg_logFC) 
-as.data.frame(top3) %>% kable() %>% kable_styling()
-write.csv(Spermatocytes_dev_mark[,-1],"./output/Spermatocytes_dev_mark.csv")
+top3 %>% kable() %>% kable_styling()
+write.csv(Spermatocytes_dev_mark,"./output/Spermatocytes_dev_mark_new.csv")
 # FeatureHeatmap
-Spermatocytes@meta.data$orig.ident <- gsub("Ad-","zAd-",Spermatocytes@meta.data$orig.ident)
-x <- FeatureHeatmap(object = Spermatocytes, 
-                    features.plot = c("Sycp1","Cmtm2b","Rbmxl2","Gfra1","Sycp3"),
-                    group.by = "orig.ident", sep.scale = T, pt.size = 0.5, 
-                    cols.use = c("gray98", "red"), pch.use = 20, do.return = T)
-
-x$data <- x$data[order(x$data$expression),]
-customize_Seurat_FeatureHeatmap(x, alpha.use = 0.8,
-                                scaled.expression.threshold = 1,
-                                gradient.use = c("orangered", "red4"))
+GOI = read.delim("./doc/Spermatogonia_dev_mark_GOI.txt", header = T)
+Customize_Seurat_FeatureHeatmap(# FeatureHeatmap
+        Spermatogonia, GOI$gene[104:109])
 
 "1-a. Do Gfra1 and Id4 markers indicate the same clusters as SSCs?" # no
 p1 <- SingleFeaturePlot.1(object = SSCs, "Gfra1", threshold = 0.5)

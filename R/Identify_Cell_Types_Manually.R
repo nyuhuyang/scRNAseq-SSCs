@@ -10,9 +10,10 @@ Featureplot <- function(x,object = SSCs,...){
     p <- FeaturePlot(object = object, 
                      reduction.use = "tsne",
                      features.plot = x, min.cutoff = NA, 
-                     cols.use = c("lightgrey","blue"), pt.size = 0.5,...)
+                     cols.use = c("lightgrey","blue"), pt.size = 1,...)
     return(p)
 }
+
 # Cell Type Marker gene database
 # Stem cell=======
 Embryonic_SCs <- MouseGenes(SSCs,c("ALPL","ALPP","ALPI","ALPPL2","TNFRSF8","TDGF1",
@@ -76,7 +77,7 @@ Neutrophil <- MouseGenes(SSCs,c("ADAM8","MSMO1","FUT4","FCGR3A","CEACAM8"))
 CD14_Monocytes <-  MouseGenes(SSCs,c("CD14","LYZ","S100A9","CCL2"))
 CD16_Monocytes <- MouseGenes(SSCs,c("FCGR3A","MS4A7","VMO1"))
 Monocytes <- unique(c(CD14_Monocytes,CD16_Monocytes))
-Macrophages <- MouseGenes(SSCs,c("LYZ","CD68","MARCO","EMR1","ITGB2"))
+Macrophages <- MouseGenes(SSCs,c("LYZ2","CD68","MARCO","EMR1","ITGB2"))
 DendriticCells <- MouseGenes(SSCs,c("Itgax","GPR183","CST3","HLA-DQA1","FCER1A","TSPAN13",
                                    "IL3RA","IGJ"))
 Platelet <- MouseGenes(SSCs,c("VWF","CD36","ITGB3","GP9","GP6","GP1BA","SELP","PDGFRB")) # CD36 is not specific
@@ -148,7 +149,16 @@ Sertoli <- MouseGenes(SSCs,c("TF","TFRC","TFR2"))
 # THY1(CD90), ADGRA3(GPR125), ITGB1(β1-integrin, CD29),Ret(c-ret), VASA(DDX4)
 # SERPINC1(EE2 antigen),Pou5f1(Oct4),EGR3,FHL1(RBM),GNL3(Nucleostemin)
 Spermatocyte <- MouseGenes(SSCs,c("KHDRBS1","SPAG16","CATSPER2","SLC25A31","SPAG6"))
-spermatozoids <- MouseGenes(SSCs,c("THY1","STRC","DEL15Q15.3","DAZ1","DAZ2","DAZ3","DAZ3"))
+Spermatogonia <- MouseGenes(SSCs,c("CBL","ITGA6","ITGB1","CD9","PROM1",
+                                   "CHEK2","DMRT1","DMRTB1","DSG2","ENO2",
+                                   "ELAVL2","EPCAM","EXOSC10","FGFR3","FMR1",
+                                   "GFRA1","ADGRA3","ID4","KIT","LIN28A","LIN28B",
+                                   "MAGEA4","NANOG","NANOS2","NANOS3","PASD1",
+                                   "PAX7","ZBTB16","POU2F2","POU5F1","SAGE1",
+                                   "SALL4","SOX3","PHF13","SPOCD1","SSX1",
+                                   "SSX2","SSX3","SSX4","SSX4B","THY1",
+                                   "TRAPPC6A","TSPY1","TSPYL1","UCHL1","UTF1",
+                                   "ZKSCAN2"))
 defective_spermatozoa <- MouseGenes(SSCs,c("TXNDC8","TXNDC2","ALOX15","NME8")) #TXNDC8(SPTRX3), ALOX15(15-LOX)
 
 # 
@@ -393,11 +403,11 @@ p2 <- TSNEPlot(SSCs, do.return = T, pt.size = 1, group.by = "ident")
 #png('./output/TSNESplot_alignment.png')
 plot_grid(p1, p2)
 
-TSNEPlot(object = SSCs, no.legend = T, do.label = F,
+TSNEPlot(object = SSCs, no.legend = F, do.label = F,
          do.return = TRUE, label.size = 5)+
-        ggtitle("All samples")+
+        ggtitle("Manually labeled cell types")+
         theme(text = element_text(size=20),     #larger text including legend title							
-              plot.title = element_text(hjust = 0.5))+ #title in middle
+              plot.title = element_text(hjust = 0.5)) #title in middle
         ggrepel::geom_label_repel(aes(label = ident))
 SpermatogonialSC <- SubsetData(SSCs,ident.use = "Spermatogonial stem cells")
 SpermatogonialSC_cells <- as.data.frame(table(SpermatogonialSC@meta.data$orig.ident))
@@ -565,3 +575,42 @@ kable(table(SSCs@ident, SSCs@meta.data$orig.ident)) %>%
 kable_styling()
 
 save(SSCs, file = "./data/SSCs_label.Rda")
+
+######################
+# merge manual marker genes and FindAllMarkers
+
+# for each cell type or cluster find which known markers are expressed in that cell type or cluster
+# label each cell type or cluster using these markers
+All_markers = read.csv("./output/All_markers_GSE43717.csv",header = T)
+All_markers = All_markers[All_markers$avg_logFC>0,]
+All_markers = All_markers[,-which(colnames(All_markers) == "X")]
+
+All_markers[All_markers$gene %in% Spermatogonia,] %>% kable() %>% kable_styling()
+SSCs_marker <- All_markers[All_markers$gene %in% Spermatogonia,"gene"]
+SingleFeaturePlot.1(object = SSCs, "Itgb1", threshold = 1.5)
+SingleFeaturePlot.1(object = SSCs, "Adgra3", threshold = 1)
+SingleFeaturePlot.1(object = SSCs, "Prom1", threshold = 0.1)
+SingleFeaturePlot.1(object = SSCs, "Dmrtb1", threshold = .5)
+SingleFeaturePlot.1(object = SSCs, "Pou2f2", threshold = .5)
+SingleFeaturePlot.1(object = SSCs, "Id4", threshold = 0.5)
+SingleFeaturePlot.1(object = SSCs, "Trappc6a", threshold = 1.0)
+SingleFeaturePlot.1(object = SSCs, "Cbl", threshold = 0.8)
+SingleFeaturePlot.1(object = SSCs, "Uchl1", threshold = 1.5)
+SingleFeaturePlot.1(object = SSCs, "Dmrt1", threshold = 1.)
+SingleFeaturePlot.1(object = SSCs, "Phf13", threshold = 1.)
+SingleFeaturePlot.1(object = SSCs, "Itga6", threshold = .5)
+SingleFeaturePlot.1(object = SSCs, "Sall4", threshold = .5)
+SingleFeaturePlot.1(object = SSCs, "Adgra3", threshold = 1.)
+SingleFeaturePlot.1(object = SSCs, "Zbtb16", threshold = .1)
+SingleFeaturePlot.1(object = SSCs, "Cd9", threshold = .5)
+SingleFeaturePlot.1(object = SSCs, "Itgb1", threshold = 1.5)
+SingleFeaturePlot.1(object = SSCs, "Fmr1", threshold = 1.5)
+SingleFeaturePlot.1(object = SSCs, "Elavl2", threshold = .5)
+SingleFeaturePlot.1(object = SSCs, "Nanos3", threshold = .3)
+SingleFeaturePlot.1(object = SSCs, "Gfra1", threshold = .1)
+SingleFeaturePlot.1(object = SSCs, "Epcam", threshold = 1.)
+SingleFeaturePlot.1(object = SSCs, "Lyz2", threshold = 1.)
+SingleFeaturePlot.1(object = SSCs, "Prm2", threshold = 3.0)
+SingleFeaturePlot.1(object = SSCs, "Pou5f1", threshold = 0.1)
+SingleFeaturePlot.1(object = SSCs, "Tspyl1", threshold = 0.1)
+Spermatogonia

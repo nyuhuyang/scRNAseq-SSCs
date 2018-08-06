@@ -209,9 +209,47 @@ boxplot(Ref_GSE43717) # too slow!!
 types = c(ref_immgen_mouse.rnaseq$types,ref_GSE43717$types)
 main_types = c(ref_immgen_mouse.rnaseq$main_types,ref_GSE43717$main_types)
 
+# Fine tune cell types
+FineTune_Mouse <- function(x){
+        x = gsub("DC \\(","Dendritic cells \\(",x)
+        x = gsub("DC$","Dendritic cells",x)
+        x = gsub("B cells, pro$","B cells",x)
+        return(x)
+}
+types = FineTune_Mouse(types)
+main_types = FineTune_Mouse(main_types)
 Ref_GSE43717 = CreateSinglerReference(name = "immgen_mouse.rnaseq_GSE43717",
                                                expr = as.matrix(Ref_GSE43717),
                                                types = types, 
                                                main_types = main_types)
 
 save(Ref_GSE43717,file='./data/GeneSets/Ref_GSE43717.RData') # it is best to name the object and the file with the same name.
+
+################################################
+# Obtain ranked marker gene list from Immgene GSE43717
+################################################
+Iname = load(file='./data/GeneSets/Ref_GSE43717.RData')
+Iname
+
+#=== Create Score matrix======
+genes = unique(unlist(Ref_GSE43717$de.genes.main$Spermatogonia))
+Nrow = length(genes)
+main_types = unique(Ref_GSE43717$main_types)
+S_matrix = matrix(data = genes, ncol = 1,
+                  dimnames = list(NULL, "gene"))
+#=== Calculate ranking score=====
+for (main_type in main_types){
+        Gen <- Ref_GSE43717$de.genes.main$Spermatogonia[main_type][[1]]
+        Gen_mat = matrix(data = c(Gen,length(Gen):1), ncol = 2,
+                        dimnames = list(NULL, c("gene",main_type)))
+        S_matrix =  merge(S_matrix,Gen_mat, by="gene",all = T)
+}
+S_matrix = S_matrix[!is.na(S_matrix$gene),]
+Gen = Hmisc::capitalize(tolower(S_matrix$gene))
+S_matrix$gene = 0
+S_matrix = as.matrix(S_matrix)
+S_matrix[is.na(S_matrix)] <- 0
+S_matrix = apply(S_matrix,2, as.numeric)
+S_matrix[,"gene"] = rowSums(S_matrix)
+rownames(S_matrix) = Gen
+markers <-rownames(S_matrix)[order(S_matrix[,"gene"],decreasing = T)]

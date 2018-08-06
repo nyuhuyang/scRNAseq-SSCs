@@ -8,13 +8,14 @@ source("../R/Seurat_functions.R")
 #====== 3.1 Create Singler Object  ==========================================
 lnames = load(file = "./data/SSCs_label.Rda")
 lnames
-lname = load(file='./data/GeneSets/GSE43717_GSE83264.RData') 
+lname = load(file='./data/GeneSets/Ref_GSE43717.RData') 
 lname
 SSCs@meta.data$orig.ident = gsub("PND18pre","PND18",SSCs@meta.data$orig.ident)
-ref_GSE43717_GSE83264$name
-length(ref_GSE43717_GSE83264$types)
-length(unique(ref_GSE43717_GSE83264$types))
-length(unique(ref_GSE43717_GSE83264$main_types))
+Ref_GSE43717$name
+length(Ref_GSE43717$types)
+length(unique(Ref_GSE43717$types))
+length(unique(Ref_GSE43717$main_types))
+length(Ref_GSE43717$sd.thres)
 #pca
 DimPlot(object = SSCs, reduction.use = "tsne", no.legend = TRUE,
         do.return = TRUE,vector.friendly = F, pt.size = 1,

@@ -22,16 +22,16 @@ table(SSCs@ident)
 table(SSCs@ident,SSCs@meta.data$orig.ident) %>% kable() %>%  kable_styling()
 Spermatogonia = SubsetData(SSCs,ident.use = "Spermatogonia")
 Spermatocytes = SubsetData(SSCs,ident.use = "Spermatocytes")
+SSCs_pure = SubsetData(SSCs,ident.use = c("Spermatocytes","Spermatogonia"))
 
 "IS A DAY 6 GFRA1-POSITIVE SPERMATOGONIUM THE SAME AS A DAY 18 GFRA1-POSITIVE SPERMATOGONIUM?"
 "IS A DAY 14 SYCP3-POSITIVE SPERMATOCYTE THE SAME AS AN ADULTSYCP3-POSITIVE SPERMATOCYTE?"
 # Step 1. find DE genes among different cell types========
-All_markers <- FindAllMarkers.UMI(SSCs,logfc.threshold = 0.5,min.pct = 0.3,
-                                  return.thresh = 0.1, only.pos = T)
+All_markers <- FindAllMarkers.UMI(SSCs_pure,return.thresh = 0.1)
 kable(All_markers[1:20,]) %>% kable_styling()
 rownames(All_markers) = NULL
 All_markers <- All_markers %>% select("gene", everything()) # Moving the last column to the start
-write.csv(All_markers,"./output/All_markers.csv")
+write.csv(All_markers,"./output/All_markers_GSE43717.csv")
 
 Spermatogonia_markers = All_markers[All_markers$cluster == "Spermatogonia",]
 kable(Spermatogonia_markers[1:20,]) %>% kable_styling()
@@ -55,10 +55,10 @@ ident.vector <- as.factor(Spermatocytes@meta.data$orig.ident)
 names(x = ident.vector) <- names(Spermatocytes@ident)
 Spermatocytes@ident = ident.vector
 
-TSNEPlot(object = Spermatocytes,do.label = F, group.by = "ident", 
-         do.return = TRUE, no.legend = F,
+TSNEPlot(object = SSCs_pure,do.label = F, group.by = "ident", 
+         do.return = TRUE, no.legend = T,
          pt.size = 1,label.size = 8 )+
-        ggtitle("Spermatocytes")+
+        ggtitle("Spermatogonia and Spermatocytes")+
         theme(text = element_text(size=20),     #larger text including legend title							
               plot.title = element_text(hjust = 0.5,size = 25, face = "bold")) 
 
@@ -101,10 +101,56 @@ kable(Spermatocytes_dev_mark[1:20,]) %>% kable_styling()
 top3 <- Spermatocytes_dev_mark %>% group_by(cluster) %>% top_n(3, avg_logFC) 
 top3 %>% kable() %>% kable_styling()
 write.csv(Spermatocytes_dev_mark,"./output/Spermatocytes_dev_mark_new.csv")
-# FeatureHeatmap
-GOI = read.delim("./doc/Spermatogonia_dev_mark_GOI.txt", header = T)
-Customize_Seurat_FeatureHeatmap(# FeatureHeatmap
-        Spermatogonia, GOI$gene[104:109])
+
+# FeatureHeatmap==========
+SSCs_pure@meta.data$orig.ident = gsub("Ad-","zAd-",SSCs_pure@meta.data$orig.ident)
+ident.vector <- as.factor(SSCs_pure@meta.data$orig.ident)
+names(x = ident.vector) <- names(SSCs_pure@ident)
+SSCs_pure@ident = ident.vector
+
+Spermatocytes_GOI = read.delim("./doc/Spermatocytes_dev_mark_new_GOI.txt", header = T)
+Spermatocytes_GOI$GOI.spermatocytes = as.character(Spermatocytes_GOI$GOI.spermatocytes)
+for (i in 1:nrow(Spermatocytes_GOI)) {
+        temp_plot = Customize_Seurat_FeatureHeatmap(SSCs_pure, Spermatocytes_GOI[i,1])+
+                theme(text = element_text(size=15))
+        ggsave(temp_plot, file=paste0("./output/tsne_matrix/Spermatocytes_GOI/",
+                                      Spermatocytes_GOI[i,1],".jpeg"),
+               width = 35.28, height = 24.69, units = "cm"
+               )
+}
+
+Spermatogonia_GOI = read.delim("./doc/Spermatogonia_dev_mark_new_GOI.txt", header = T)
+Spermatogonia_GOI$GOI.spermatogonia = as.character(Spermatogonia_GOI$GOI.spermatogonia)
+for (i in 45:nrow(Spermatogonia_GOI)) {
+        temp_plot = Customize_Seurat_FeatureHeatmap(SSCs_pure, Spermatogonia_GOI[i,1])+
+                theme(text = element_text(size=15))
+        ggsave(temp_plot, file=paste0("./output/tsne_matrix/Spermatogonia_GOI/",
+                                      Spermatogonia_GOI[i,1],".jpeg"),
+               width = 35.28, height = 24.69, units = "cm"
+        )
+}
+
+# DoHeatmap==================
+# Spermatogonia
+Spermatogonia_develop = read.csv("./output/Spermatogonia_dev_mark_new.csv",header = T)
+Spermatogonia_develop = Spermatogonia_develop[,-1]
+top10 <- Spermatogonia_develop %>% group_by(cluster) %>%
+        top_n(10, avg_logFC)
+top10 %>% kable() %>% kable_styling()
+DoHeatmap(object = Spermatogonia, genes.use = top10$gene, 
+          slim.col.label = TRUE, remove.key = TRUE,group.label.rot = T,
+          title = "Spermatogonia development markers")
+
+# Spermatocytes
+Spermatocytes_develop = read.csv("./output/Spermatocytes_dev_mark_new.csv",header = T)
+Spermatocytes_develop = Spermatocytes_develop[,-1]
+top10 <- Spermatocytes_develop %>% group_by(cluster) %>%
+        top_n(10, avg_logFC)
+top10 %>% kable() %>% kable_styling()
+DoHeatmap(object = Spermatocytes, genes.use = top10$gene, 
+          slim.col.label = TRUE, remove.key = TRUE,group.label.rot = T,
+          title = "Spermatocytes development markers")
+
 
 "1-a. Do Gfra1 and Id4 markers indicate the same clusters as SSCs?" # no
 p1 <- SingleFeaturePlot.1(object = SSCs, "Gfra1", threshold = 0.5)

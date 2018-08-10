@@ -77,6 +77,9 @@ out$p+  ggtitle("Supervised cell type labeling by immgen and GSE43717")+#ggplot 
         theme(text = element_text(size=20),     #larger text including legend title
               plot.title = element_text(hjust = 0.5,size = 18, face = "bold")) #title in middle
 
+g <- ggplot_build(out$p)
+colors.g = unique(g$data[[1]]["colour"])
+colors.g = colors.g$colour
 #Finally, we can also view the labeling as a table compared to the original identities:
 
 # cell number

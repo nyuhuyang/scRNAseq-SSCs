@@ -428,7 +428,6 @@ DimPlot.1 <- function (object, reduction.use = "pca", dim.1 = 1, dim.2 = 2,
 }
 
 
-
 # combine FindAllMarkers and calculate average UMI
 FindAllMarkers.UMI <- function (object, genes.use = NULL, logfc.threshold = 0.25, 
                                 test.use = "wilcox", min.pct = 0.1, min.diff.pct = -Inf, 
@@ -975,21 +974,28 @@ randomStrings <- function(n = 5000) {
 # rename ident for certain cells only
 # cells.use is vector of cell name
 RenameIdent.1 <- function (object, old.ident.name = NULL, new.ident.name = NULL,
-                             cells.use = NULL) 
+                           cells.use = NULL) 
 {
         if (!is.null(old.ident.name)) {
                 if(!old.ident.name %in% object@ident) {
-                 stop(paste("Error : ", old.ident.name, " is not a current identity class"))
+                        stop(paste("Error : ", old.ident.name, " is not a current identity class"))
                 }
         }
         new.levels <- old.levels <- levels(x = object@ident)
+        if (new.ident.name %in% old.levels) {
+                new.levels <- new.levels[new.levels != old.ident.name]
+        }
+        if (!(new.ident.name %in% old.levels)) {
+                new.levels <- c(new.levels,new.ident.name)
+        }
+        
         ident.vector <- as.character(x = object@ident)
         names(x = ident.vector) <- names(object@ident)
         ident.vector[cells.use] <- new.ident.name
         object@ident <- factor(x = ident.vector, levels = new.levels)
+        
         return(object)
 }
-
 
 # FeaturePlot doesn't return ggplot
 # SingleFeaturePlot doesn't take seurat object as input

@@ -64,22 +64,21 @@ out = SingleR.PlotTsne.1(singler$singler[[1]]$SingleR.single,
                          do.letters = F,labels = singler$singler[[1]]$SingleR.single$labels,
                          label.size = 5, dot.size = 1,do.legend = F,alpha = 1,
                          label.repel = T,force=2)
-out$p+  ggtitle("Supervised sub-cell type labeling by immgen, GSE43717 and GSE83264")+#ggplot title
-        theme(text = element_text(size=20),     #larger text including legend title
-              plot.title = element_text(hjust = 0.5,size = 18, face = "bold")) #title in middle
+out+  ggtitle("Supervised sub-cell type labeling by immgen, GSE43717 and GSE83264")+
+        theme(text = element_text(size=20),
+              plot.title = element_text(hjust = 0.5,size = 18, face = "bold"))
 # main types-------
 out = SingleR.PlotTsne.1(singler$singler[[1]]$SingleR.single.main,
                          singler$meta.data$xy,do.label=T,
                          do.letters = F,labels = singler$singler[[1]]$SingleR.single.main$labels,
                          label.size = 5, dot.size = 1,do.legend = F,alpha = 1,
                          label.repel = T,force=2)
-out$p+  ggtitle("Supervised cell type labeling by immgen and GSE43717")+#ggplot title
-        theme(text = element_text(size=20),     #larger text including legend title
-              plot.title = element_text(hjust = 0.5,size = 18, face = "bold")) #title in middle
+out$p+  ggtitle("Supervised cell type labeling by immgen and GSE43717")+
+        theme(text = element_text(size=20),
+              plot.title = element_text(hjust = 0.5,size = 18, face = "bold"))
 
 g <- ggplot_build(out$p)
-colors.g = unique(g$data[[1]]["colour"])
-colors.g = colors.g$colour
+
 #Finally, we can also view the labeling as a table compared to the original identities:
 
 # cell number
@@ -104,7 +103,7 @@ TSNEPlot(object = SSCs,do.label = F, group.by = "ident",
          do.return = TRUE, no.legend = F,
          pt.size = 1,label.size = 8 )+
         ggtitle("Supervised cell type labeling by GSE43717")+
-        theme(text = element_text(size=20),     #larger text including legend title							
+        theme(text = element_text(size=20),							
               plot.title = element_text(hjust = 0.5))
 
 save(SSCs, file = "./data/SSCs_suplabel_GSE43717.Rda")

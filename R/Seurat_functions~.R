@@ -211,16 +211,16 @@ customize_Seurat_Featureplot <- function(p, alpha.use = 0.8,
 }
 
 
-# add geom_text_repel
-DimPlot.1 <- function (object, reduction.use = "pca", dim.1 = 1, dim.2 = 2, 
-          cells.use = NULL, pt.size = 1, do.return = FALSE, do.bare = FALSE, 
-          cols.use = NULL, group.by = "ident", pt.shape = NULL, do.hover = FALSE, 
-          data.hover = "ident", do.identify = FALSE, do.label = FALSE, 
-          label.size = 4, no.legend = FALSE, coord.fixed = FALSE, 
-          no.axes = FALSE, dark.theme = FALSE, plot.order = NULL, 
-          cells.highlight = NULL, cols.highlight = "red", sizes.highlight = 1, 
-          plot.title = NULL, vector.friendly = FALSE, png.file = NULL, 
-          png.arguments = c(10, 10, 100), na.value = "grey50", ...) 
+DimPlot.1 <- function (object, reduction.use = "pca", dim.1 = 1, dim.2 = 2,
+                       cells.use = NULL, pt.size = 1, do.return = FALSE, do.bare = FALSE,
+                       cols.use = NULL, group.by = "ident", pt.shape = NULL, do.hover = FALSE,
+                       data.hover = "ident", do.identify = FALSE, do.label = FALSE,
+                       label.size = 4, no.legend = FALSE, coord.fixed = FALSE,
+                       no.axes = FALSE, dark.theme = FALSE, plot.order = NULL,
+                       cells.highlight = NULL, cols.highlight = "red", sizes.highlight = 1,
+                       plot.title = NULL, vector.friendly = FALSE, png.file = NULL,
+                       png.arguments = c(10, 10, 100), na.value = "grey50",
+                       text.repel = TRUE, label.repel = FALSE,force=1, ...)
 {
         if (vector.friendly) {
                 previous_call <- blank_call <- png_call <- match.call()
@@ -234,9 +234,9 @@ DimPlot.1 <- function (object, reduction.use = "pca", dim.1 = 1, dim.2 = 2,
                 png_call$plot.title <- NULL
                 blank_plot <- eval(blank_call, sys.frame(sys.parent()))
                 png_plot <- eval(png_call, sys.frame(sys.parent()))
-                png.file <- Seurat:::SetIfNull(x = png.file, default = paste0(tempfile(), 
-                                                                     ".png"))
-                ggsave(filename = png.file, plot = png_plot, width = png.arguments[1], 
+                png.file <- Seurat:::SetIfNull(x = png.file, default = paste0(tempfile(),
+                                                                              ".png"))
+                ggsave(filename = png.file, plot = png_plot, width = png.arguments[1],
                        height = png.arguments[2], dpi = png.arguments[3])
                 to_return <- AugmentPlot(plot1 = blank_plot, imgFile = png.file)
                 file.remove(png.file)
@@ -247,13 +247,13 @@ DimPlot.1 <- function (object, reduction.use = "pca", dim.1 = 1, dim.2 = 2,
                         print(to_return)
                 }
         }
-        embeddings.use <- GetDimReduction(object = object, reduction.type = reduction.use, 
+        embeddings.use <- GetDimReduction(object = object, reduction.type = reduction.use,
                                           slot = "cell.embeddings")
         if (length(x = embeddings.use) == 0) {
                 stop(paste(reduction.use, "has not been run for this object yet."))
         }
         cells.use <- Seurat:::SetIfNull(x = cells.use, default = colnames(x = object@data))
-        dim.code <- GetDimReduction(object = object, reduction.type = reduction.use, 
+        dim.code <- GetDimReduction(object = object, reduction.type = reduction.use,
                                     slot = "key")
         dim.codes <- paste0(dim.code, c(dim.1, dim.2))
         data.plot <- as.data.frame(x = embeddings.use)
@@ -261,7 +261,7 @@ DimPlot.1 <- function (object, reduction.use = "pca", dim.1 = 1, dim.2 = 2,
         data.plot <- data.plot[cells.use, dim.codes]
         ident.use <- as.factor(x = object@ident[cells.use])
         if (group.by != "ident") {
-                ident.use <- as.factor(x = FetchData(object = object, 
+                ident.use <- as.factor(x = FetchData(object = object,
                                                      vars.all = group.by)[cells.use, 1])
         }
         data.plot$ident <- ident.use
@@ -297,7 +297,7 @@ DimPlot.1 <- function (object, reduction.use = "pca", dim.1 = 1, dim.2 = 2,
                         else {
                                 names(x = cells.highlight)
                         }
-                        sizes.highlight <- rep_len(x = sizes.highlight, 
+                        sizes.highlight <- rep_len(x = sizes.highlight,
                                                    length.out = length(x = cells.highlight))
                         cols.highlight <- rep_len(x = cols.highlight, length.out = length(x = cells.highlight))
                         highlight <- rep_len(x = NA_character_, length.out = nrow(x = data.plot))
@@ -327,23 +327,23 @@ DimPlot.1 <- function (object, reduction.use = "pca", dim.1 = 1, dim.2 = 2,
                 if (any(!plot.order %in% data.plot$ident)) {
                         stop("invalid ident in plot.order")
                 }
-                plot.order <- rev(x = c(plot.order, setdiff(x = unique(x = data.plot$ident), 
+                plot.order <- rev(x = c(plot.order, setdiff(x = unique(x = data.plot$ident),
                                                             y = plot.order)))
                 data.plot$ident <- factor(x = data.plot$ident, levels = plot.order)
                 data.plot <- data.plot[order(data.plot$ident), ]
         }
-        p <- ggplot(data = data.plot, mapping = aes(x = x, y = y)) + 
-                geom_point(mapping = aes(colour = factor(x = ident), 
+        p <- ggplot(data = data.plot, mapping = aes(x = x, y = y, colour =ident)) +
+                geom_point(mapping = aes(colour = factor(x = ident),
                                          size = pt.size))
         if (!is.null(x = pt.shape)) {
-                shape.val <- FetchData(object = object, vars.all = pt.shape)[cells.use, 
+                shape.val <- FetchData(object = object, vars.all = pt.shape)[cells.use,
                                                                              1]
                 if (is.numeric(shape.val)) {
                         shape.val <- cut(x = shape.val, breaks = 5)
                 }
                 data.plot[, "pt.shape"] <- shape.val
-                p <- ggplot(data = data.plot, mapping = aes(x = x, y = y)) + 
-                        geom_point(mapping = aes(colour = factor(x = ident), 
+                p <- ggplot(data = data.plot, mapping = aes(x = x, y = y)) +
+                        geom_point(mapping = aes(colour = factor(x = ident),
                                                  shape = factor(x = pt.shape), size = pt.size))
         }
         if (!is.null(x = cols.use)) {
@@ -353,11 +353,11 @@ DimPlot.1 <- function (object, reduction.use = "pca", dim.1 = 1, dim.2 = 2,
                 p <- p + coord_fixed()
         }
         p <- p + guides(size = FALSE)
-        p2 <- p + xlab(label = dim.codes[[1]]) + ylab(label = dim.codes[[2]]) + 
+        p2 <- p + xlab(label = dim.codes[[1]]) + ylab(label = dim.codes[[2]]) +
                 scale_size(range = c(min(data.plot$pt.size), max(data.plot$pt.size)))
-        p3 <- p2 + Seurat:::SetXAxisGG() + Seurat:::SetYAxisGG() + 
-                Seurat:::SetLegendPointsGG(x = 6) + 
-                Seurat:::SetLegendTextGG(x = 12) + Seurat:::no.legend.title + theme_bw() + 
+        p3 <- p2 + Seurat:::SetXAxisGG() + Seurat:::SetYAxisGG() +
+                Seurat:::SetLegendPointsGG(x = 6) +
+                Seurat:::SetLegendTextGG(x = 12) + Seurat:::no.legend.title + theme_bw() +
                 Seurat:::NoGrid()
         if (dark.theme) {
                 p <- p + DarkTheme()
@@ -368,24 +368,43 @@ DimPlot.1 <- function (object, reduction.use = "pca", dim.1 = 1, dim.2 = 2,
                 p3 <- p3 + ggtitle(plot.title) + theme(plot.title = element_text(hjust = 0.5))
         }
         if (do.label) {
-                centers <- data.plot %>% dplyr::group_by(ident) %>% 
-                        dplyr::summarize(x = median(x = x), y = median(x = y))
-                p3 <- p3 + geom_point(data = centers, 
-                                      mapping = aes(x = x,y = y),
-                                      size = 0, alpha = 0) + 
-                        #geom_text(data = centers, 
-                        #          mapping = aes(label = ident), size = label.size)+
-                        ggrepel::geom_text_repel(data = centers, aes(x = x, y = y,label = ident),
-                                                 size = label.size)}
+                centers <- data.plot %>% dplyr::group_by(ident) %>%
+                        dplyr::summarize(x = median(x), y = median(y))
+                p3 = p3 + geom_point(data = centers, aes(x = x, y = y),
+                                     size = 0, alpha = 0)
+                if (label.repel == TRUE) {
+                        p3 = p3 + ggrepel::geom_label_repel(data = centers,
+                                                            aes(label = ident),
+                                                            size = label.size,
+                                                            force = force)
+                }
+                else if (text.repel == TRUE){
+                        p3 = p3 + ggrepel::geom_text_repel(data = centers,
+                                                           aes(label = ident),
+                                                           size = label.size,
+                                                           force = force,
+                                                           color = "black")
+                }
+                if (label.repel == FALSE & text.repel == FALSE) {
+                        p3 = p3 + geom_text(data = centers,
+                                            aes(label = ident),
+                                            size = label.size,
+                                            color = "black")
+                }
+                p3 = p3 + guides(colour = FALSE)
+                x.range = layer_scales(p)$x$range$range
+                add_to_x = sum(abs(x.range)) * 0.03
+                p3 = p3 + xlim(x.range[1] - add_to_x, x.range[2] + add_to_x)
+        }
         if (no.legend) {
                 p3 <- p3 + theme(legend.position = "none")
         }
         if (no.axes) {
-                p3 <- p3 + theme(axis.line = element_blank(), axis.text.x = element_blank(), 
-                                 axis.text.y = element_blank(), axis.ticks = element_blank(), 
-                                 axis.title.x = element_blank(), axis.title.y = element_blank(), 
-                                 panel.background = element_blank(), panel.border = element_blank(), 
-                                 panel.grid.major = element_blank(), panel.grid.minor = element_blank(), 
+                p3 <- p3 + theme(axis.line = element_blank(), axis.text.x = element_blank(),
+                                 axis.text.y = element_blank(), axis.ticks = element_blank(),
+                                 axis.title.x = element_blank(), axis.title.y = element_blank(),
+                                 panel.background = element_blank(), panel.border = element_blank(),
+                                 panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
                                  plot.background = element_blank())
         }
         if (do.identify || do.hover) {
@@ -400,14 +419,14 @@ DimPlot.1 <- function (object, reduction.use = "pca", dim.1 = 1, dim.2 = 2,
                                 features.info <- NULL
                         }
                         else {
-                                features.info <- FetchData(object = object, 
+                                features.info <- FetchData(object = object,
                                                            vars.all = data.hover)
                         }
-                        return(HoverLocator(plot = plot.use, data.plot = data.plot, 
+                        return(HoverLocator(plot = plot.use, data.plot = data.plot,
                                             features.info = features.info, dark.theme = dark.theme))
                 }
                 else if (do.identify) {
-                        return(FeatureLocator(plot = plot.use, data.plot = data.plot, 
+                        return(FeatureLocator(plot = plot.use, data.plot = data.plot,
                                               dark.theme = dark.theme, ...))
                 }
         }

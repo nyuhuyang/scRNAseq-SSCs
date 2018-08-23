@@ -6,14 +6,15 @@
 
 library(Seurat)
 library(dplyr)
-library(ggrepel)
+library(Matrix)
+library(sva)
 source("../R/Seurat_functions.R")
 ########################################################################
 #
-#  1 Seurat Alignment 
+#  1 Data preprocessing
 # 
 # ######################################################################
-#======1.1 Setup the Seurat objects =========================
+#======1.1 Load the data files and Set up Seurat object =========================
 # Load the dataset
 
 # setup Seurat objects since both count matrices have already filtered
@@ -22,137 +23,143 @@ source("../R/Seurat_functions.R")
 # rename all "_" into "-" in sample names 
 SSCs_raw <- list()
 SSCs_Seurat <- list()
-samples <- c("Ad-depleteSp","Ad-Thy1","PND14","PND18","PND18pre",
-             "PND25","PND30","PND6" )
-conditions <- c("Adault-SSCs","Adault-SSCs","first-wave","first-wave",
-                "first-wave","first-wave","first-wave","first-wave" )
-
+samples <- c("PND06","PND14","PND18","PND18pre",
+             "PND25","PND30","Ad-depleteSp","Ad-Thy1")
+conditions <- c("first-wave","first-wave","first-wave","first-wave",
+                "first-wave","first-wave","Adault-SSCs","Adault-SSCs")
 for(i in 1:length(samples)){
-    SSCs_raw[[i]] <- Read10X(data.dir = paste0("./data/",
-                                                     samples[i],"/outs/filtered_gene_bc_matrices/mm10/"))
-    colnames(SSCs_raw[[i]]) <- paste0(samples[i],"_",colnames(SSCs_raw[[i]]))
-    SSCs_Seurat[[i]] <- CreateSeuratObject(SSCs_raw[[i]],
-                                           min.cells = 3,
-                                           min.genes = 200,
-                                           names.delim = "_")
-    SSCs_Seurat[[i]]@meta.data$conditions <- conditions[i]
+        SSCs_raw[[i]] <- Read10X(data.dir = paste0("./data/",
+                                                   samples[i],"/outs/filtered_gene_bc_matrices/mm10/"))
+        colnames(SSCs_raw[[i]]) <- paste0(samples[i],"_",colnames(SSCs_raw[[i]]))
+        SSCs_Seurat[[i]] <- CreateSeuratObject(SSCs_raw[[i]],
+                                               min.cells = 3,
+                                               min.genes = 200,
+                                               names.delim = "_")
+        SSCs_Seurat[[i]]@meta.data$conditions <- conditions[i]
 }
-SSCs_Seurat <- lapply(SSCs_Seurat, FilterCells, 
-                            subset.names = "nGene", 
-                            low.thresholds = 200, 
-                            high.thresholds = Inf)
-SSCs_Seurat <- lapply(SSCs_Seurat, NormalizeData)
-SSCs_Seurat <- lapply(SSCs_Seurat, ScaleData)
-SSCs_Seurat <- lapply(SSCs_Seurat, FindVariableGenes, do.plot = FALSE)
+SSCs <- Reduce(function(x, y) MergeSeurat(x, y, do.normalize = F), SSCs_Seurat)
+remove(SSCs_raw,SSCs_Seurat);GC()
+SSCs <- FilterCells(SSCs, subset.names = "nGene",
+                    low.thresholds = 200,
+                    high.thresholds = Inf) %>%
+        NormalizeData() %>%
+        ScaleData(display.progress = FALSE) %>%
+        FindVariableGenes(do.plot = FALSE, display.progress = FALSE)
+save(SSCs, file = "./data/SSCs_20180821.Rda")
 
-# we will take the union of the top 1k variable genes in each dataset for
-# alignment note that we use 1k genes in the manuscript examples, you can
-# try this here with negligible changes to the overall results
-genes.use <- lapply(SSCs_Seurat, function(x) head(rownames(x@hvg.info), 600))
-genes.use <- unique(unlist(genes.use))
-for(i in 1:length(samples)){
-        genes.use <- intersect(genes.use, rownames(SSCs_Seurat[[i]]@scale.data))
-}
-length(genes.use) # 1/10 of total sample size
-
-
-#======1.2 Perform a canonical correlation analysis (CCA) =========================
-# run a canonical correlation analysis to identify common sources
-# of variation between the two datasets.
-remove(SSCs_raw)
-GC()
-SSCs <- RunMultiCCA(object.list = SSCs_Seurat, 
-                    genes.use = genes.use,
-                    niter = 25, num.ccs = 50,
-                    standardize =TRUE)
-save(SSCs, file = "./data/SSCs_alignment.Rda")
-
+#======1.2 QC, pre-processing and normalizing the data=========================
 # Calculate median UMI per cell
 SSCs_raw_data <- as.matrix(x = SSCs@raw.data)
 mean(colSums(SSCs_raw_data))
 median(colSums(SSCs_raw_data))
-boxplot(colSums(SSCs_raw_data))
-# CCA plot CC1 versus CC2 and look at a violin plot
-p1 <- DimPlot(object = SSCs, reduction.use = "cca", group.by = "orig.ident", 
-              pt.size = 0.5, do.return = TRUE)
-p2 <- VlnPlot(object = SSCs, features.plot = "CC1", group.by = "orig.ident", 
-              do.return = TRUE)
-plot_grid(p1, p2)
-
-AverageExpression()
-p3 <- MetageneBicorPlot(SSCs, grouping.var = "orig.ident", dims.eval = 1:50, 
-                        display.progress = TRUE, display.progress = FALSE,
-                        smooth = TRUE) # run on cluster
-p3 + geom_smooth(method = 'loess')
-
-PrintDim(object = SSCs, reduction.type = "cca", dims.print = 1:2, genes.print = 10)
-
-DimHeatmap(object = SSCs, reduction.type = "cca", cells.use = 500, dim.use = c(1:9), 
-           do.balanced = TRUE)
-DimHeatmap(object = SSCs, reduction.type = "cca", cells.use = 500, dim.use = c(10:18), 
-           do.balanced = TRUE)
-#======1.3 QC =========================
-SSCs <- CalcVarExpRatio(object = SSCs, reduction.type = "pca",
-                              grouping.var = "orig.ident", dims.use = 1:10)
-SSCs <- SubsetData(SSCs, subset.name = "var.ratio.pca",accept.low = 0.5) #15555 out of 15650
+min(colSums(SSCs_raw_data))
+#boxplot(colSums(SSCs_raw_data))
+remove(SSCs_raw_data);GC()
 
 mito.genes <- grep(pattern = "^mt-", x = rownames(x = SSCs@data), value = TRUE)
 percent.mito <- Matrix::colSums(SSCs@raw.data[mito.genes, ])/Matrix::colSums(SSCs@raw.data)
 SSCs <- AddMetaData(object = SSCs, metadata = percent.mito, col.name = "percent.mito")
-#SSCs <- ScaleData(object = SSCs, genes.use = genes.use, display.progress = FALSE, 
-#                         vars.to.regress = "percent.mito")
-#Now we can run a single integrated analysis on all cells!
-VlnPlot(object = SSCs, features.plot = c("nGene", "nUMI", "percent.mito"), nCol = 1)
-SSCs <- FilterCells(object = SSCs, subset.names = c("nGene", "percent.mito"), 
-                          low.thresholds = c(500, -Inf), high.thresholds = c(7000, 0.15))
 
-par(mfrow = c(1, 2))
+g1 <- VlnPlot(object = SSCs, features.plot = c("nGene", "nUMI", "percent.mito"), nCol = 1,
+             x.lab.rot = T, do.return = T)
+g1
+SSCs <- FilterCells(object = SSCs, subset.names = c("nGene","nUMI","percent.mito"),
+                    low.thresholds = c(500,2000, -Inf), 
+                    high.thresholds = c(8000,125000, 0.15))
+
+par(mfrow = c(2, 1))
 GenePlot(object = SSCs, gene1 = "nUMI", gene2 = "percent.mito")
 GenePlot(object = SSCs, gene1 = "nUMI", gene2 = "nGene")
 
-#======1.4 align seurat objects =========================
-#Now we align the CCA subspaces, which returns a new dimensional reduction called cca.aligned
-set.seed(42)
-SSCs <- AlignSubspace(object = SSCs, reduction.type = "cca", grouping.var = "orig.ident", 
-                            dims.align = 1:10)
-SSCs@project.name <- "Paula"
-#Now we can run a single integrated analysis on all cells!
-
-SSCs <- FindClusters(object = SSCs, reduction.type = "cca.aligned", dims.use = 1:10, 
-                           resolution = 1.0, force.recalc = T, save.SNN = TRUE)
-
-SSCs <- RunTSNE(object = SSCs, reduction.use = "cca.aligned", dims.use = 1:10, 
-                      do.fast = TRUE)
-
-p1 <- TSNEPlot(SSCs, do.return = T, pt.size = 1, group.by = "orig.ident")
-p2 <- TSNEPlot(SSCs, do.return = T, pt.size = 1, group.by = "ident")
-#png('./output/TSNESplot_alignment.png')
-plot_grid(p1, p2)
-#dev.off()
-TSNEPlot(object = SSCs,do.label = T, group.by = "ident", 
-         do.return = TRUE, no.legend = T,
+g2 <- VlnPlot(object = SSCs, features.plot = c("nGene", "nUMI", "percent.mito"), nCol = 1,
+              group.by = "orig.ident", x.lab.rot = T, do.return = T)
+plot_grid(g1,g2)
+# After removing unwanted cells from the dataset, the next step is to normalize the data.
+SSCs <- NormalizeData(object = SSCs, normalization.method = "LogNormalize", 
+                      scale.factor = 10000)
+SSCs <- FindVariableGenes(object = SSCs, mean.function = ExpMean, 
+                          dispersion.function = LogVMR, do.plot = FALSE, 
+                          x.low.cutoff = 0.0125, x.high.cutoff = 3, y.cutoff = 0.5)
+length(SSCs@var.genes)
+#======1.3 1st run of pca-tsne  =========================
+SSCs <- ScaleData(object = SSCs) %>%
+        RunPCA() %>%
+        FindClusters(dims.use = 1:20, force.recalc = T, print.output = FALSE) %>%
+        RunTSNE()
+#SSCs@meta.data$orig.ident <- gsub("PND18pre","PND18",SSCs@meta.data$orig.ident)
+TSNEPlot(object = SSCs, do.label = F, group.by = "orig.ident", 
+         do.return = TRUE, no.legend = F,# colors.use = singler.colors,
          pt.size = 1,label.size = 8 )+
-        ggtitle("All samples")+
-        theme(text = element_text(size=20),     #larger text including legend title							
-              plot.title = element_text(hjust = 0.5)) #title in middle
+        ggtitle("TSNEPlot of all samples")+
+        theme(text = element_text(size=15),							
+              plot.title = element_text(hjust = 0.5,size = 18, face = "bold")) 
 
-#======1.5 RunPCA==================================
-SSCs <- FindVariableGenes(object = SSCs, mean.function = ExpMean, dispersion.function = LogVMR, 
-                         do.plot = FALSE)
-hv.genes <- head(rownames(SSCs@hvg.info), 1000)
-SSCs <- RunPCA(object = SSCs, pc.genes = hv.genes, pcs.compute = 100, do.print = TRUE, 
-              pcs.print = 1:5, genes.print = 5)
+save(SSCs, file = "./data/SSCs_20180821.Rda")
+Iname = load("./data/SSCs_20180821.Rda")
+
+#======1.4 Add Cell-cycle score =========================
+# Read in a list of cell cycle markers, from Tirosh et al, 2015
+cc.genes <- readLines(con = "./data/seurat_resources/regev_lab_cell_cycle_genes.txt")
+# We can segregate this list into markers of G2/M phase and markers of S phase
+s.genes <- MouseGenes(SSCs,cc.genes[1:43])
+g2m.genes <- MouseGenes(SSCs,cc.genes[44:97])
+# Assign Cell-Cycle Scores
+SSCs <- CellCycleScoring(object = SSCs, s.genes = s.genes, g2m.genes = g2m.genes, 
+                         set.ident = TRUE)
+# Visualize the distribution of cell cycle markers across
+RidgePlot(object = SSCs, features.plot = MouseGenes(SSCs,c("PCNA", "TOP2A", "MCM6", "MKI67")), 
+          nCol = 2)
+# regressing out the difference between the G2M and S phase scores
+SSCs@meta.data$CC.Difference <- SSCs@meta.data$S.Score - SSCs@meta.data$G2M.Score
+# view cell cycle scores and phase assignments
+head(x = SSCs@meta.data)
+
+#======1.5 Add batch id =========================
+batchname = SSCs@meta.data$orig.ident
+batchid = rep(NA,length(batchname))
+batchid[batchname %in% c("PND14","PND18","PND18pre","PND30")] = 1
+batchid[batchname %in% c("PND06","PND25","Ad-depleteSp","Ad-Thy1")] = 2
+names(batchid) = rownames(SSCs@meta.data)
+SSCs <- AddMetaData(object = SSCs, metadata = batchid, col.name = "batchid")
+table(SSCs@meta.data$batchid)
+head(x = SSCs@meta.data)
+#======1.6 batch-correct using ComBat =========================
+SingleFeaturePlot.1(SSCs,"nUMI",threshold=20000)
+SingleFeaturePlot.1(SSCs,"batchid",threshold=1.0)
+SingleFeaturePlot.1(SSCs,"percent.mito",threshold=0.05)
+SingleFeaturePlot.1(SSCs,"CC.Difference",threshold=0.05)
+m = as.matrix(SSCs@data)
+m = m[rowSums(m)>0,]
+com = ComBat(m, batchid, prior.plots=FALSE, par.prior=TRUE)
+#----save files just in case------
+saveRDS(Matrix(as.matrix(com)), file = "./data/Combat_data.Rda")
+saveRDS(SSCs@data, file = "./data/SSCs_data.Rda")
+#---------------------
+SSCs@data = readRDS("./data/Combat_data.Rda")
+SSCs@scale.data = NULL
+SSCs <- ScaleData(object = SSCs,genes.use = SSCs@var.genes, model.use = "negbinom", do.par=T,
+                  vars.to.regress = c("CC.Difference"),#"CC.Difference","percent.mito"--nogood,"nUMI"--nogood
+                  display.progress = T)
+SSCs@data =  readRDS("./data/SSCs_data.Rda")
+
+#======1.7 unsupervised clustering =========================
+SSCs <- RunPCA(object = SSCs, pc.genes = SSCs@var.genes, pcs.compute = 100, 
+               do.print = TRUE, pcs.print = 1:5, genes.print = 5)
+PCAPlot(object = SSCs)
 PCElbowPlot(object = SSCs, num.pc = 100)
 PCHeatmap(SSCs, pc.use = c(1:3, 25:30), cells.use = 500, do.balanced = TRUE)
-SSCs <- FindClusters(object = SSCs, reduction.type = "pca", dims.use = 1:30, resolution = 1, 
-                    save.SNN = TRUE, n.start = 10, nn.eps = 0.5, print.output = FALSE)
-SSCs <- RunTSNE(object = SSCs, reduction.use = "pca", dims.use = 1:30, 
-                do.fast = TRUE)
-TSNEPlot(object = SSCs,do.label = T, group.by = "orig.ident", 
-         do.return = TRUE, no.legend = T,
-         pt.size = 1,label.size = 8 )+
-        ggtitle("All samples")+
-        theme(text = element_text(size=15),     #larger text including legend title							
-              plot.title = element_text(hjust = 0.5)) 
 
-save(SSCs, file = "./data/SSCs_alignment.Rda")
+SSCs <- FindClusters(object = SSCs, reduction.type = "pca", dims.use = 1:30, resolution = 0.8, 
+                     k.param = 30,force.recalc = T,
+                     save.SNN = TRUE, n.start = 100, nn.eps = 0, print.output = FALSE)
+SSCs <- RunTSNE(object = SSCs, reduction.use = "pca", dims.use = 1:30, 
+                do.fast = TRUE, perplexity= 30)
+#SSCs@meta.data$orig.ident <- gsub("PND18pre","PND18",SSCs@meta.data$orig.ident)
+TSNEPlot(object = SSCs, do.label = F, group.by = "orig.ident", 
+         do.return = TRUE, no.legend = T,# colors.use = singler.colors,
+         pt.size = 1,label.size = 8 )+
+        ggtitle("TSNEPlot of all samples")+
+        theme(text = element_text(size=15),							
+              plot.title = element_text(hjust = 0.5,size = 18, face = "bold")) 
+
+save(SSCs, file = "./data/SSCs_20180822.Rda")

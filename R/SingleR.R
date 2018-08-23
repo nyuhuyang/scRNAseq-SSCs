@@ -4,40 +4,39 @@ library(reshape2)
 library(pheatmap)
 library(kableExtra)
 source("../R/Seurat_functions.R")
+source("../R/SingleR_functions.R")
 
-#====== 3.1 Create Singler Object  ==========================================
-lnames = load(file = "./data/SSCs_label.Rda")
-lnames
-lname = load(file='./data/GeneSets/Ref_GSE43717.RData') 
-lname
-SSCs@meta.data$orig.ident = gsub("PND18pre","PND18",SSCs@meta.data$orig.ident)
+#====== 2.1 load data  ==========================================
+lname1 = load(file = "./data/SSCs_20180822.Rda");lname1
+lname2 = load(file='./data/GeneSets/Ref_GSE43717.RData');lname2
 Ref_GSE43717$name
 length(Ref_GSE43717$types)
 length(unique(Ref_GSE43717$types))
 length(unique(Ref_GSE43717$main_types))
 length(Ref_GSE43717$sd.thres)
-#pca
 DimPlot(object = SSCs, reduction.use = "tsne", no.legend = TRUE,
         do.return = TRUE,vector.friendly = F, pt.size = 1,
         do.label = TRUE,label.size = 8, group.by = "ident") + 
         ggtitle("Cluster ID") + 
         theme(plot.title = element_text(hjust = 0.5))
+SSCs@project.name = "Paula"
+#====== 2.2 Create Singler Object  ==========================================
 singler = CreateSinglerObject(as.matrix(SSCs@data), annot = NULL, 
                               project.name=SSCs@project.name,
                               min.genes = 500,technology = "10X", species = "Mouse",
-                              ref.list = list(GSE43717_GSE83264), normalize.gene.length = F, 
+                              ref.list = list(Ref_GSE43717), normalize.gene.length = F, 
                               variable.genes = "de",
-                              fine.tune = F, do.signatures = F, clusters = NULL)
+                              fine.tune = F, do.signatures = F, clusters = SSCs@ident)
 GC()
 singler$meta.data$orig.ident = SSCs@meta.data$orig.ident # the original identities, if not supplied in 'annot'
 singler$meta.data$xy = SSCs@dr$tsne@cell.embeddings # the tSNE coordinates
 singler$meta.data$clusters = SSCs@ident # the Seurat clusters (if 'clusters' not provided)
-save(singler,file="./output/singler_SSCs.RData")
-#====== 3.2 SingleR specifications ==========================================
+save(singler,file="./output/singler_20180822.RData")
+#====== 2.3 SingleR specifications ==========================================
 # Step 1: Spearman coefficient
-lnames = load(file = "./output/singler_Ref_GSE43717.RData")
+lnames = load(file = "./output/singler_20180822.RData")
 lnames
-singler$seurat = SSCs # (optional)
+singler$seurat = NULL # (optional)
 SingleR.DrawScatter(sc_data = singler$seurat@data,cell_id = 10, 
                     ref = immgen, sample_id = 232)
 
@@ -71,20 +70,23 @@ out+  ggtitle("Supervised sub-cell type labeling by immgen, GSE43717 and GSE8326
 out = SingleR.PlotTsne.1(singler$singler[[1]]$SingleR.single.main,
                          singler$meta.data$xy,do.label=T,
                          do.letters = F,labels = singler$singler[[1]]$SingleR.single.main$labels,
-                         label.size = 5, dot.size = 1,do.legend = F,alpha = 1,
-                         label.repel = T,force=2)
-out$p+  ggtitle("Supervised cell type labeling by immgen and GSE43717")+
+                         label.size = 5, dot.size = 2,do.legend = F,alpha = 1,
+                         label.repel = T,force=25)
+out +  ggtitle("Supervised cell type labeling by immgen and GSE43717")+
         theme(text = element_text(size=20),
               plot.title = element_text(hjust = 0.5,size = 18, face = "bold"))
-
-g <- ggplot_build(out$p)
-
-#Finally, we can also view the labeling as a table compared to the original identities:
-
+#====== 2.4 compared to the original identities ==========================================
 # cell number
-kable(table(singler$singler[[1]]$SingleR.single.main$labels,
-            singler$meta.data$orig.ident)) %>%
-        kable_styling()
+singler$meta.data$orig.ident = gsub("Ad-","zAd-",singler$meta.data$orig.ident)
+singler$meta.data$orig.ident = gsub("PDN18","PDN18pre",singler$meta.data$orig.ident)
+counts <- table(singler$singler[[1]]$SingleR.single.main$labels,
+                singler$meta.data$orig.ident)
+kable(counts) %>% kable_styling()
+
+barplot(counts, main="Total numbers of cell types vs. time-points",
+        xlab="Number of Gears", col=singler.colors,
+        legend = rownames(counts),
+        args.legend = list(x = "top", bty = "n"))
 # cell percentage
 prop.table(x = table(singler$singler[[1]]$SingleR.single.main$labels,
                      SSCs@meta.data$orig.ident),margin = 2) %>%
@@ -92,18 +94,18 @@ prop.table(x = table(singler$singler[[1]]$SingleR.single.main$labels,
 # total cell number
 table(singler$meta.data$orig.ident) %>% t() %>% kable() %>% kable_styling()
 
-# Rename ident
+#====== 2.5 Rename ident ==========================================
 table(names(SSCs@ident) == rownames(singler$singler[[1]]$SingleR.single.main$labels))
 
 ident.use <- as.factor(as.character(singler$singler[[1]]$SingleR.single.main$labels))
 names(ident.use) = rownames(singler$singler[[1]]$SingleR.single.main$labels)
 SSCs@ident <- ident.use
 
-TSNEPlot(object = SSCs,do.label = F, group.by = "ident", 
-         do.return = TRUE, no.legend = F,
-         pt.size = 1,label.size = 8 )+
+TSNEPlot.1(object = SSCs,do.label = T, group.by = "ident", 
+         do.return = TRUE, no.legend = T,colors.use = singler.colors,
+         pt.size = 1,label.size = 5,label.repel = T,force=25)+
         ggtitle("Supervised cell type labeling by GSE43717")+
         theme(text = element_text(size=20),							
-              plot.title = element_text(hjust = 0.5))
+              plot.title = element_text(hjust = 0.5, face = "bold"))
 
-save(SSCs, file = "./data/SSCs_suplabel_GSE43717.Rda")
+save(SSCs, file = "./data/SSCs_20180822.Rda")

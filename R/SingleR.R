@@ -5,7 +5,7 @@ library(pheatmap)
 library(kableExtra)
 source("../R/Seurat_functions.R")
 source("../R/SingleR_functions.R")
-
+AverageExpression ()
 #====== 2.1 load data  ==========================================
 lname1 = load(file = "./data/SSCs_20180822.Rda");lname1
 lname2 = load(file='./data/GeneSets/Ref_GSE43717.RData');lname2
@@ -78,7 +78,7 @@ out +  ggtitle("Supervised cell type labeling by immgen and GSE43717")+
 #====== 2.4 compared to the original identities ==========================================
 # cell number
 singler$meta.data$orig.ident = gsub("Ad-","zAd-",singler$meta.data$orig.ident)
-singler$meta.data$orig.ident = gsub("PDN18","PDN18pre",singler$meta.data$orig.ident)
+singler$meta.data$orig.ident = gsub("PND18pre","PND18",singler$meta.data$orig.ident)
 counts <- table(singler$singler[[1]]$SingleR.single.main$labels,
                 singler$meta.data$orig.ident)
 kable(counts) %>% kable_styling()

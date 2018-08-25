@@ -1,11 +1,16 @@
-### histogram
-CountsbyIdent <- function(object = SSCs, subset.name = "Txndc8", accept.low = 1,use.raw = T,
-                          ident.remove = NULL, cells.use = NULL, accept.high = Inf, 
-                          accept.value = NULL, max.cells.per.ident = Inf, random.seed = 1, 
-                          ...){
+# TRUE Global Environment
+
+#' Produce a contingency table with certain gene expression at different ident
+#'
+#' @param object seurat object
+#' @param subset.name Parameter to subset on. Eg, the name of a gene, PC1, ... 
+#' Any argument that can be retreived using FetchData
+#' @export Cells_ident nX2 dataframe with orig.ident at column1, Freq at column2
+#' @examples
+#' CountsbyIdent(SSCs,"Gfra1")
+CountsbyIdent <- function(object,subset.name,...){
         "Generate nX2 dataframe with orig.ident at column1, Freq at column2"
-        cells.use <- WhichCells(object = SSCs, subset.name = subset.name, 
-                                accept.low = accept.low,use.raw = T,...)
+        cells.use <- WhichCells(object=object,subset.name=subset.name,...)
         Cells.use <- data.frame("cells"=cells.use,"ident"=sub('_.*', '', cells.use))
         Cells_ident <- as.data.frame(table(Cells.use$ident))
         colnames(Cells_ident)[2] <- subset.name
@@ -13,139 +18,37 @@ CountsbyIdent <- function(object = SSCs, subset.name = "Txndc8", accept.low = 1,
 }
 
 
-
-#' Convert counts to transcripts per million (TPM).
-#' 
-#' Convert a numeric matrix of features (rows) and conditions (columns) with
-#' raw feature counts to transcripts per million.
-#' 
-#'    Lior Pachter. Models for transcript quantification from RNA-Seq.
-#'    arXiv:1104.3889v2 
-#'    
-#'    Wagner, et al. Measurement of mRNA abundance using RNA-seq data:
-#'    RPKM measure is inconsistent among samples. Theory Biosci. 24 July 2012.
-#'    doi:10.1007/s12064-012-0162-3
-#'    
-#' @param counts A numeric matrix of raw feature counts i.e.
-#'  fragments assigned to each gene.
-#' @param featureLength A numeric vector with feature lengths.
-#' @param meanFragmentLength A numeric vector with mean fragment lengths.
-#' @return tpm A numeric matrix normalized by library size and feature length.
-counts_to_tpm <- function(counts, featureLength, meanFragmentLength) {
+#' a supprting function for SingleFeaturePlot.1 and FeatureHeatmap.1
+#' Change ggplot color scale to increase contrast gradient
+#' #https://github.com/satijalab/seurat/issues/235
+#' @param p ggplot object
+#' @param alpha.use Define transparency of points
+#' @param gradient.use Change fill and colour gradient values
+#' @param scaled.expression.threshold Define lower limit of scaled gene expression level
+#' @export p ggplot object
+ChangeColorScale <- function(p, alpha.use = 0.8,
+                             gradient.use = c("yellow", "red"),
+                             scaled.expression.threshold = 0) {
+        # Order data by scaled gene expresion level
+        # Compute maximum value in gene expression
+        if (length(p$data$scaled.expression)>0){                # FeatureHeatmap.1
+                p$data <- p$data[order(p$data$scaled.expression),]
+                max.scaled.exp <- max(p$data$scaled.expression)
+        } else if (length(p$data$gene)>0){                   # SingleFeaturePlot.1 
+                p$data <- p$data[order(p$data$gene),] 
+                max.scaled.exp <- max(p$data$gene) 
+        }
         
-        # Ensure valid arguments.
-        stopifnot(length(featureLength) == nrow(counts))
-        stopifnot(length(meanFragmentLength) == ncol(counts))
-        
-        # Compute effective lengths of features in each library.
-        effLen <- do.call(cbind, lapply(1:ncol(counts), function(i) {
-                featureLength - meanFragmentLength[i] + 1
-        }))
-        
-        # Exclude genes with length less than the mean fragment length.
-        idx <- apply(effLen, 1, function(x) min(x) > 1)
-        counts <- counts[idx,]
-        effLen <- effLen[idx,]
-        featureLength <- featureLength[idx]
-        
-        # Process one column at a time.
-        tpm <- do.call(cbind, lapply(1:ncol(counts), function(i) {
-                rate = log(counts[,i]) - log(effLen[,i])
-                denom = log(sum(exp(rate)))
-                exp(rate - denom + log(1e6))
-        }))
-        
-        # Copy the row and column names from the original matrix.
-        colnames(tpm) <- colnames(counts)
-        rownames(tpm) <- rownames(counts)
-        return(tpm)
-}
-
-rpkm <- function(counts, lengths) {
-        rate <- counts / lengths 
-        rate / sum(counts) * 1e6
-}
-
-tpm <- function(counts, lengths) {
-        rate <- counts / lengths
-        rate / sum(rate) * 1e6
-}
-#### For FeatureHeatmap() ####
-#https://github.com/satijalab/seurat/issues/235
-# Function to pseudo customize FeatureHeatmap
-#### For FeaturePlot() ####
-# Function to pseudo customize FeaturePlots
-customize_Seurat_FeaturePlot <- function(p, alpha.use = 1, gradient.use = c("yellow", "red"),
-                                         expression.threshold = 0, is.log1p.transformed = F) {
-        
-        #### Main function ####
-        main_function <- function(p = p, alpha.use = alpha.use, gradient.use = gradient.use,
-                                  expression.threshold = expression.threshold,
-                                  is.log1p.transformed = is.log1p.transformed) {
-                
-                # Order data by gene expresion level
-                p$data <- p$data[order(p$data$gene),]
-                
-                # Define lower limit of gene expression level
-                if (isTRUE(is.log1p.transformed)) {
-                        expression.threshold <- expression.threshold
-                } else {
-                        expression.threshold <- log1p(expression.threshold)
+        # Define lower limit of scaled gene expression level
+        if (!is.null(scaled.expression.threshold)) {
+                scaled.expression.threshold <- scaled.expression.threshold
+        } else if (is.null(scaled.expression.threshold)) {
+                if (length(p$data$scaled.expression)>0){
+                        scaled.expression.threshold <- min(p$data$scaled.expression)
+                } else if (length(p$data$gene)>0) {
+                        scaled.expression.threshold <- min(p$data$gene)
                 }
-                
-                # Compute maximum value in gene expression
-                max.exp <- max(p$data$gene)
-                
-                # Fill points using the gene expression levels
-                p$layers[[1]]$mapping$fill <- p$layers[[1]]$mapping$colour
-                
-                # Define transparency of points
-                p$layers[[1]]$mapping$alpha <- alpha.use
-                
-                # Change fill and colour gradient values
-                p <- p + scale_colour_gradientn(colours = gradient.use, guide = F, 
-                                                limits = c(expression.threshold, max.exp),
-                                                na.value = "grey") +
-                        scale_fill_gradientn(colours = gradient.use,
-                                             name = expression(atop(Expression, (log))),
-                                             limits = c(expression.threshold, max.exp),
-                                             na.value = "grey") +
-                        scale_alpha_continuous(range = alpha.use, guide = F)
         }
-        
-        #### Execution of main function ####
-        # Apply main function on all features
-        p <- lapply(X = p, alpha.use = alpha.use, gradient.use = gradient.use, 
-                    expression.threshold = expression.threshold,
-                    is.log1p.transformed = is.log1p.transformed,
-                    FUN = main_function)
-        
-        # Arrange all plots using cowplot
-        # Adapted from Seurat
-        # https://github.com/satijalab/seurat/blob/master/R/plotting.R#L1100
-        # ncol argument adapted from Josh O'Brien
-        # https://stackoverflow.com/questions/10706753/how-do-i-arrange-a-variable-list-of-plots-using-grid-arrange
-        cowplot::plot_grid(plotlist = p, ncol = ceiling(sqrt(length(p))))
-}
-
-#### For FeatureHeatmap() ####
-# Function to pseudo customize FeatureHeatmap
-customize_Seurat_FeatureHeatmap <- function(p, alpha.use = 1, 
-                                            gradient.use = c("yellow", "red"),
-                                            scaled.expression.threshold = NULL) {
-        
-        # Order data by scaled gene expresion level
-        p$data <- p$data[order(p$data$scaled.expression),]
-        
-        # Define lower limit of scaled gene expression level
-        if (!is.null(scaled.expression.threshold)) {
-                scaled.expression.threshold <- scaled.expression.threshold
-        } else if (is.null(scaled.expression.threshold)) {
-                scaled.expression.threshold <- min(p$data$scaled.expression)
-        }
-        
-        # Compute maximum value in gene expression
-        max.scaled.exp <- max(p$data$scaled.expression)
         
         # Fill points using the scaled gene expression levels
         p$layers[[1]]$mapping$fill <- p$layers[[1]]$mapping$colour
@@ -154,10 +57,11 @@ customize_Seurat_FeatureHeatmap <- function(p, alpha.use = 1,
         p$layers[[1]]$mapping$alpha <- alpha.use
         
         # Change fill and colour gradient values
-        p <- p + scale_colour_gradientn(colours = gradient.use, guide = F,
-                                        limits = c(scaled.expression.threshold,
-                                                   max.scaled.exp),
-                                        na.value = "grey") +
+        p = p + guides(colour = FALSE)
+        p = p + scale_colour_gradientn(colours = gradient.use, guide = F,
+                                       limits = c(scaled.expression.threshold,
+                                                  max.scaled.exp),
+                                       na.value = "grey") +
                 scale_fill_gradientn(colours = gradient.use,
                                      name = expression(atop(Scaled, expression)),
                                      limits = c(scaled.expression.threshold,
@@ -166,51 +70,51 @@ customize_Seurat_FeatureHeatmap <- function(p, alpha.use = 1,
                 scale_alpha_continuous(range = alpha.use, guide = F)
         
         # Return plot
-        p
-}
-
-#### For FeatureHeatmap() ####
-# Function to pseudo customize FeatureHeatmap
-customize_Seurat_Featureplot <- function(p, alpha.use = 0.8, 
-                                         gradient.use = c("yellow", "red"),
-                                         scaled.expression.threshold = 0) {
-        
-        # Order data by scaled gene expresion level
-        p$data <- p$data[order(p$data$gene),]
-        
-        # Define lower limit of scaled gene expression level
-        if (!is.null(scaled.expression.threshold)) {
-                scaled.expression.threshold <- scaled.expression.threshold
-        } else if (is.null(scaled.expression.threshold)) {
-                scaled.expression.threshold <- min(p$data$gene)
-        }
-        
-        # Compute maximum value in gene expression
-        max.scaled.exp <- max(p$data$gene)
-        
-        # Fill points using the scaled gene expression levels
-        p$layers[[1]]$mapping$fill <- p$layers[[1]]$mapping$colour
-        
-        # Define transparency of points
-        p$layers[[1]]$mapping$alpha <- alpha.use
-        
-        # Change fill and colour gradient values
-        p <- p + scale_colour_gradientn(colours = gradient.use, guide = F,
-                                        limits = c(scaled.expression.threshold,
-                                                   max.scaled.exp),
-                                        na.value = "grey") +
-                scale_fill_gradientn(colours = gradient.use,
-                                     name = expression(atop(Scaled, expression)),
-                                     limits = c(scaled.expression.threshold,
-                                                max.scaled.exp),
-                                     na.value = "grey") +
-                scale_alpha_continuous(range = alpha.use, guide = F)
-        
-        # Return plot
-        p
+        return(p)
 }
 
 
+#' Modified Seurat::FeatureHeatmap function to increase contrast gradient
+#' 
+#' #https://github.com/satijalab/seurat/issues/235
+#' @param object Seurat object
+#' @param features.plot gene name
+#' @param gradient.use Change fill and colour gradient values
+#' @param scaled.expression.threshold Define lower limit of scaled gene expression level
+#' @export p ggplot object
+#' @example FeatureHeatmap.1(SSCs,"Gfra1")
+FeatureHeatmap.1 <- function(object, features.plot, mouse.genes = TRUE,
+                             group.by ="orig.ident",  alpha.use = 1,
+                             pt.size = 0.5, scaled.expression.threshold = 0.1,
+                             gradient.use = c("orangered", "red4"),
+                             pch.use = 20) {
+        
+        if (mouse.genes) features.plot = MouseGenes(object =  object, unique = T,
+                                                    marker.genes = features.plot)
+        else features.plot = HumanGenes(object =  object, unique = T,
+                                        marker.genes = features.plot)
+        
+        x <- FeatureHeatmap(object = object, features.plot = features.plot,
+                            group.by = group.by, sep.scale = T, pt.size = pt.size, 
+                            cols.use = c("gray98", "red"), pch.use = pch.use, do.return = T)
+        x$data <- x$data[order(x$data$expression),]
+        p <- ChangeColorScale(x, alpha.use = alpha.use,
+                              scaled.expression.threshold = scaled.expression.threshold,
+                              gradient.use = gradient.use)
+        return(p)
+        
+}
+
+
+#' Modified Seurat::DimPlot function to add ggrepel::geom_text_repel and ggrepel::geom_label_repel
+#' A supporting function for TSNEPlot.1
+#' @param object Seurat object
+#' @param text.repel Adds text directly to the plot.
+#' @param label.repel Draws a rectangle underneath the text, making it easier to read.
+#' @param force Force of repulsion between overlapping text labels. Defaults to 1.
+#' @param ... all other paramethers are the same as Seurat::DimPlot
+#' @export p/p3 ggplot object
+#' @example DimPlot.1(SSCs, reduction.use = "tsne")
 DimPlot.1 <- function (object, reduction.use = "pca", dim.1 = 1, dim.2 = 2,
                        cells.use = NULL, pt.size = 1, do.return = FALSE, do.bare = FALSE,
                        cols.use = NULL, group.by = "ident", pt.shape = NULL, do.hover = FALSE,
@@ -447,9 +351,13 @@ DimPlot.1 <- function (object, reduction.use = "pca", dim.1 = 1, dim.2 = 2,
 }
 
 
-# combine FindAllMarkers and calculate average UMI
+#' Combine FindAllMarkers and calculate average UMI
+#' Modified Seurat::FindAllMarkers function to add average UMI for group1 (UMI.1) and group 2 (UMI.2)
+#' @param ... all paramethers are the same as Seurat::FindAllMarkers
+#' @export gde.all data frame
+#' @example FindAllMarkers.UMI(SSCs)
 FindAllMarkers.UMI <- function (object, genes.use = NULL, logfc.threshold = 0.25, 
-                                test.use = "wilcox", min.pct = 0.1, min.diff.pct = -Inf, 
+                                test.use = "MAST", min.pct = 0.1, min.diff.pct = -Inf, 
                                 print.bar = TRUE, only.pos = FALSE, max.cells.per.ident = Inf, 
                                 return.thresh = 0.01, do.print = FALSE, random.seed = 1, 
                                 min.cells = 3, latent.vars = "nUMI", assay.type = "RNA", 
@@ -466,24 +374,14 @@ FindAllMarkers.UMI <- function (object, genes.use = NULL, logfc.threshold = 0.25
         avg_UMI <- list()
         for (i in 1:length(x = idents.all)) {
                 genes.de[[i]] <- tryCatch({
-                        FindMarkers.1(object = object, assay.type = assay.type, 
-                                      ident.1 = idents.all[i], ident.2 = NULL, genes.use = genes.use, 
-                                      logfc.threshold = logfc.threshold, test.use = test.use, 
-                                      min.pct = min.pct, min.diff.pct = min.diff.pct, 
-                                      print.bar = print.bar, min.cells = min.cells, 
-                                      latent.vars = latent.vars, max.cells.per.ident = max.cells.per.ident, 
-                                      ...)
-                }, error = function(cond) {
-                        return(NULL)
+                        FindMarkers.UMI(object = object, assay.type = assay.type, 
+                                        ident.1 = idents.all[i], ident.2 = NULL, genes.use = genes.use, 
+                                        logfc.threshold = logfc.threshold, test.use = test.use, 
+                                        min.pct = min.pct, min.diff.pct = min.diff.pct, 
+                                        print.bar = print.bar, min.cells = min.cells, 
+                                        latent.vars = latent.vars, max.cells.per.ident = max.cells.per.ident, 
+                                        ...)
                 })
-                pct.1_UMI <-rowMeans(as.matrix(x = object@data[, WhichCells(object = object,
-                                                                            ident = idents.all[[i]])]))
-                pct.2_UMI <-rowMeans(as.matrix(x = object@data[, WhichCells(object = object,
-                                                                            ident.remove = idents.all[[i]])]))
-                avg_UMI[[i]] <-data.frame(pct.1_UMI, pct.2_UMI)
-                genes.de[[i]] <- cbind(genes.de[[i]],
-                                       avg_UMI[[i]][match(rownames(genes.de[[i]]), 
-                                                          rownames(avg_UMI[[i]])),])
                 if (do.print) {
                         print(paste("Calculating cluster", idents.all[i]))
                 }
@@ -521,250 +419,45 @@ FindAllMarkers.UMI <- function (object, genes.use = NULL, logfc.threshold = 0.25
 }
 
 
-FindMarkers.1 <- function (object, ident.1, ident.2 = NULL, genes.use = NULL, 
-                           logfc.threshold = 0.25, test.use = "wilcox", min.pct = 0.1, 
-                           min.diff.pct = -Inf, print.bar = TRUE, only.pos = FALSE, 
-                           max.cells.per.ident = Inf, random.seed = 1, latent.vars = "nUMI", 
-                           min.cells = 3, pseudocount.use = 1, assay.type = "RNA", 
-                           ...) 
+#' Calculate average UMI and attach to FindMarkers results 
+#' Modified Seurat::FindMarkers function to add average UMI for group1 (UMI.1) and group 2 (UMI.2)
+#' @param ... all paramethers are the same as Seurat::FindMarkers
+#' @export gde.all data frame
+#' @example FindMarkers.UMI(SSCs,ident.1 = "1")
+FindMarkers.UMI <- function (object, ident.1, ident.2 = NULL, genes.use = NULL,
+                             logfc.threshold = 0.25, test.use = "wilcox", min.pct = 0.1,
+                             min.diff.pct = -Inf, print.bar = TRUE, only.pos = FALSE,
+                             max.cells.per.ident = Inf, random.seed = 1, latent.vars = "nUMI",
+                             min.cells.gene = 3, pseudocount.use = 1, assay.type = "RNA",
+                             ...)
 {
-        data.use <- GetAssayData(object = object, assay.type = assay.type, 
-                                 slot = "data")
-        genes.use <- Seurat:::SetIfNull(x = genes.use, default = rownames(x = data.use))
-        methods.noprefiliter <- c("DESeq2", "zingeR")
-        if (test.use %in% methods.noprefiliter) {
-                genes.use <- rownames(x = data.use)
-                min.diff.pct <- -Inf
-                logfc.threshold <- 0
-        }
-        if (length(x = as.vector(x = ident.1) > 1) && any(as.character(x = ident.1) %in% 
-                                                          object@cell.names)) {
-                cells.1 <- intersect(x = ident.1, y = object@cell.names)
-        }
-        else {
-                cells.1 <- WhichCells(object = object, ident = ident.1)
-        }
-        if (length(x = as.vector(x = ident.2) > 1) && any(as.character(x = ident.2) %in% 
-                                                          object@cell.names)) {
-                cells.2 <- intersect(x = ident.2, y = object@cell.names)
-        }
-        else {
-                if (is.null(x = ident.2)) {
-                        cells.2 <- WhichCells(object = object, cells.use = setdiff(object@cell.names, 
-                                                                                   cells.1))
-                }
-                else {
-                        cells.2 <- WhichCells(object = object, ident = ident.2)
-                }
-        }
-        cells.2 <- setdiff(x = cells.2, y = cells.1)
-        if (length(x = cells.1) == 0) {
-                print(paste("Cell group 1 is empty - no cells with identity class", 
-                            ident.1))
-                return(NULL)
-        }
-        if (length(x = cells.2) == 0) {
-                print(paste("Cell group 2 is empty - no cells with identity class", 
-                            ident.2))
-                return(NULL)
-        }
-        if (length(cells.1) < min.cells) {
-                stop(paste("Cell group 1 has fewer than", as.character(min.cells), 
-                           "cells in identity class", ident.1))
-        }
-        if (length(cells.2) < min.cells) {
-                stop(paste("Cell group 2 has fewer than", as.character(min.cells), 
-                           " cells in identity class", ident.2))
-        }
-        thresh.min <- 0
-        data.temp1 <- round(x = apply(X = data.use[genes.use, cells.1, 
-                                                   drop = F], MARGIN = 1, FUN = function(x) {
-                                                           return(sum(x > thresh.min)/length(x = x))
-                                                   }), digits = 3)
-        data.temp2 <- round(x = apply(X = data.use[genes.use, cells.2, 
-                                                   drop = F], MARGIN = 1, FUN = function(x) {
-                                                           return(sum(x > thresh.min)/length(x = x))
-                                                   }), digits = 3)
-        data.alpha <- cbind(data.temp1, data.temp2)
-        colnames(x = data.alpha) <- c("pct.1", "pct.2")
-        alpha.min <- apply(X = data.alpha, MARGIN = 1, FUN = max)
-        names(x = alpha.min) <- rownames(x = data.alpha)
-        genes.use <- names(x = which(x = alpha.min > min.pct))
-        if (length(x = genes.use) == 0) {
-                stop("No genes pass min.pct threshold")
-        }
-        alpha.diff <- alpha.min - apply(X = data.alpha, MARGIN = 1, 
-                                        FUN = min)
-        genes.use <- names(x = which(x = alpha.min > min.pct & alpha.diff > 
-                                             min.diff.pct))
-        if (length(x = genes.use) == 0) {
-                stop("No genes pass min.diff.pct threshold")
-        }
-        data.1 <- apply(X = data.use[genes.use, cells.1, drop = F], 
-                        MARGIN = 1, FUN = function(x) log(x = mean(x = expm1(x = x)) + 
-                                                                  pseudocount.use))
-        data.2 <- apply(X = data.use[genes.use, cells.2, drop = F], 
-                        MARGIN = 1, FUN = function(x) log(x = mean(x = expm1(x = x)) + 
-                                                                  pseudocount.use))
-        total.diff <- (data.1 - data.2)
-        if (!only.pos) 
-                genes.diff <- names(x = which(x = abs(x = total.diff) > 
-                                                      logfc.threshold))
-        if (only.pos) 
-                genes.diff <- names(x = which(x = total.diff > logfc.threshold))
-        genes.use <- intersect(x = genes.use, y = genes.diff)
-        if (length(x = genes.use) == 0) {
-                stop("No genes pass logfc.threshold threshold")
-        }
-        if (max.cells.per.ident < Inf) {
-                set.seed(seed = random.seed)
-                if (length(cells.1) > max.cells.per.ident) 
-                        cells.1 = sample(x = cells.1, size = max.cells.per.ident)
-                if (length(cells.2) > max.cells.per.ident) 
-                        cells.2 = sample(x = cells.2, size = max.cells.per.ident)
-        }
-        if (test.use == "bimod") {
-                to.return <- DiffExpTest(object = object, assay.type = assay.type, 
-                                         cells.1 = cells.1, cells.2 = cells.2, genes.use = genes.use, 
-                                         print.bar = print.bar)
-        }
-        if (test.use == "roc") {
-                to.return <- MarkerTest(object = object, assay.type = assay.type, 
-                                        cells.1 = cells.1, cells.2 = cells.2, genes.use = genes.use, 
-                                        print.bar = print.bar)
-        }
-        if (test.use == "t") {
-                to.return <- DiffTTest(object = object, assay.type = assay.type, 
-                                       cells.1 = cells.1, cells.2 = cells.2, genes.use = genes.use, 
-                                       print.bar = print.bar)
-        }
-        if (test.use == "tobit") {
-                to.return <- TobitTest(object = object, assay.type = assay.type, 
-                                       cells.1 = cells.1, cells.2 = cells.2, genes.use = genes.use, 
-                                       print.bar = print.bar)
-        }
-        if (test.use == "negbinom") {
-                to.return <- NegBinomDETest(object = object, assay.type = assay.type, 
-                                            cells.1 = cells.1, cells.2 = cells.2, genes.use = genes.use, 
-                                            latent.vars = latent.vars, print.bar = print.bar, 
-                                            min.cells = min.cells)
-        }
-        if (test.use == "poisson") {
-                to.return <- PoissonDETest(object = object, assay.type = assay.type, 
-                                           cells.1 = cells.1, cells.2 = cells.2, genes.use = genes.use, 
-                                           latent.vars = latent.vars, print.bar = print.bar)
-        }
-        if (test.use == "MAST") {
-                to.return <- MASTDETest(object = object, assay.type = assay.type, 
-                                        cells.1 = cells.1, cells.2 = cells.2, genes.use = genes.use, 
-                                        latent.vars = latent.vars, ...)
-        }
-        if (test.use == "wilcox") {
-                to.return <- WilcoxDETest(object = object, assay.type = assay.type, 
-                                          cells.1 = cells.1, cells.2 = cells.2, genes.use = genes.use, 
-                                          print.bar = print.bar, ...)
-        }
-        if (test.use == "DESeq2") {
-                to.return <- DESeq2DETest(object = object, assay.type = assay.type, 
-                                          cells.1 = cells.1, cells.2 = cells.2, genes.use = genes.use, 
-                                          ...)
-        }
-        to.return[, "avg_logFC"] <- total.diff[rownames(x = to.return)]
-        to.return <- cbind(to.return, data.alpha[rownames(x = to.return), 
-                                                 ])
-        to.return$p_val_adj = p.adjust(p = to.return$p_val, method = "bonferroni", 
-                                       n = nrow(GetAssayData(object = object, assay.type = assay.type, 
-                                                             slot = "data")))
-        if (test.use == "roc") {
-                to.return <- to.return[order(-to.return$power, -to.return$avg_logFC), 
-                                       ]
-        }
-        else {
-                to.return <- to.return[order(to.return$p_val, -to.return$avg_logFC), 
-                                       ]
-        }
-        if (only.pos) {
-                to.return <- subset(x = to.return, subset = avg_logFC > 
-                                            0)
-        }
-        return(to.return)
+        genes.de <- FindMarkers(object = object, assay.type = assay.type,
+                                ident.1 = ident.1, ident.2 = ident.2, genes.use = genes.use,
+                                logfc.threshold = logfc.threshold, test.use = test.use,
+                                min.pct = min.pct, min.diff.pct = min.diff.pct,
+                                print.bar = print.bar, min.cells.gene = min.cells.gene,
+                                latent.vars = latent.vars, max.cells.per.ident = max.cells.per.ident,
+                                ...)
+        UMI.1 <-rowMeans(as.matrix(x = object@raw.data[, WhichCells(object = object,
+                                                                    ident = ident.1)]))
+        UMI.2 <-rowMeans(as.matrix(x = object@raw.data[, WhichCells(object = object,
+                                                                    ident.remove = ident.1)]))
+        avg_UMI <-data.frame(UMI.1, UMI.2)
+        genes.de <- cbind(genes.de,avg_UMI[match(rownames(genes.de),rownames(avg_UMI)),])
+        
+        return(genes.de)
 }
 
-# find and print differentially expressed genes across conditions ================
-# combine SetIdent,indMarkers and avg_UMI
-FindAllMarkersAcrossConditions<- function(object, genes.use = NULL, logfc.threshold = 0.25, 
-                                          test.use = "wilcox", min.pct = 0.1, min.diff.pct = -Inf, 
-                                          print.bar = TRUE, only.pos = FALSE, max.cells.per.ident = Inf, 
-                                          return.thresh = 0.01, do.print = FALSE, random.seed = 1,
-                                          latent.vars = "nUMI", assay.type = "RNA", 
-                                          ...) 
-{   
-        "find and print differentially expressed genes across conditions"
-        cells <- FetchData(object,"conditions")
-        cells$ident <- object@ident
-        cells$new.ident <- paste0(cells$ident,"_",cells$conditions)
-        object <- SetIdent(object, cells.use = rownames(cells),
-                           ident.use = cells$new.ident)
-        idents.all <- sort(x = unique(x = cells$ident))
-        genes.de <- list()
-        avg_UMI <- list()
-        conditions <- levels(cells$conditions)
-        for (i in 1:length(x = idents.all)) {
-                genes.de[[i]] <- tryCatch({
-                        FindMarkers(object = object, 
-                                    ident.1 = paste0(idents.all[i],"_",conditions[1]),
-                                    ident.2 = paste0(idents.all[i],"_",conditions[2]), 
-                                    logfc.threshold = logfc.threshold, test.use = test.use, 
-                                    min.pct = min.pct, min.diff.pct = min.diff.pct,...)
-                }, error = function(cond) {
-                        return(NULL)
-                })
-                pct.1_UMI <-rowMeans(as.matrix(x = object@data[, WhichCells(object = object,
-                                                                            ident = paste0(idents.all[i],"_",conditions[1]))]))
-                pct.2_UMI <-rowMeans(as.matrix(x = object@data[, WhichCells(object = object,
-                                                                            ident = paste0(idents.all[i],"_",conditions[2]))]))
-                avg_UMI[[i]] <-data.frame(pct.1_UMI, pct.2_UMI)
-                genes.de[[i]] <- cbind(genes.de[[i]],
-                                       avg_UMI[[i]][match(rownames(genes.de[[i]]), 
-                                                          rownames(avg_UMI[[i]])),])
-        }
-        gde.all <- data.frame()
-        for (i in 1:length(x = idents.all)) {
-                if (is.null(x = unlist(x = genes.de[i]))) {
-                        next
-                }
-                gde <- genes.de[[i]]
-                if (nrow(x = gde) > 0) {
-                        if (test.use == "roc") {
-                                gde <- subset(x = gde, subset = (myAUC > return.thresh | 
-                                                                         myAUC < (1 - return.thresh)))
-                        }
-                        else {
-                                gde <- gde[order(gde$p_val, -gde$avg_logFC), 
-                                           ]
-                                gde <- subset(x = gde, subset = p_val < return.thresh)
-                        }
-                        if (nrow(x = gde) > 0) {
-                                gde$cluster <- paste(idents.all[i],conditions[1],"vs",
-                                                     conditions[2],sep = "_")
-                                gde$gene <- rownames(x = gde)
-                        }
-                        if (nrow(x = gde) > 0) {
-                                gde.all <- rbind(gde.all, gde)
-                        }
-                }
-        }
-        if (only.pos) {
-                return(subset(x = gde.all, subset = avg_logFC > 0))
-        }
-        rownames(x = gde.all) <- make.unique(names = as.character(x = gde.all$gene))
-        #    object.name <- 
-        #    write.csv(x= gde.all,
-        #convert variable (object) name into String
-        #              file=paste0("./output/",deparse(substitute(object)),"_young_vs_aged.csv"))
-        return(gde.all)
-}
 
+FPKM <- function(counts, lengths) {
+        rownames(counts) = tolower(rownames(counts))
+        names(lengths) = tolower(names(lengths))
+        A = intersect(rownames(counts), names(lengths))
+        counts = counts[A, ]
+        lengths = lengths[A]
+        rate = counts/lengths
+        sweep(rate,2,FUN="/",STATS=colSums(counts)) * 1e+06
+}
 
 #=====Clean memory======================
 GC <- function()
@@ -819,28 +512,6 @@ gg_colors <- function(object = object, return.vector=FALSE, cells.use = NULL,
         }
 }
 
-
-# HumanGenes
-# turn list of gene character to uniform Human gene list format
-HumanGenes <- function(object, marker.genes, unique=FALSE){
-        # marker.genes =c("Cdh5,Pecam1,Flt1,Vwf,Plvap,Kdr") for example
-        if(missing(object)) 
-                stop("A seurat object must be provided first")
-        if(class(object) != "seurat") 
-                stop("A seurat object must be provided first")
-        if(missing(marker.genes)) 
-                stop("A list of marker genes must be provided")
-        if(object@var.genes[1]==Hmisc::capitalize(tolower(object@var.genes[1])))
-                stop("This is mouse genome, use MouseGenes() instead!")
-        
-        marker.genes <- as.character(marker.genes)
-        marker.genes <- unlist(strsplit(marker.genes,","))
-        marker.genes <- toupper(marker.genes)
-        marker.genes <- CaseMatch(search = marker.genes, match = rownames(x = object@raw.data))
-        if(unique) marker.genes <- unique(marker.genes)
-        print(length(marker.genes))
-        return(as.character(marker.genes))
-}
 
 
 # select ggplot color
@@ -911,66 +582,43 @@ GenePlot.1 <- function (object, gene1, gene2, cell.ids = NULL, col.use = NULL,
         }
 }
 
-LabelPoint <- function(plot, genes, exp.mat, adj.x.t = 0, adj.y.t = 0, adj.x.s = 0, 
-                       adj.y.s = 0, text.size = 2.5, segment.size = 0.1) {
-        for (i in genes) {
-                x1 <- exp.mat[i, 1]
-                y1 <- exp.mat[i, 2]
-                plot <- plot + annotate("text", x = x1 + adj.x.t, y = y1 + adj.y.t, 
-                                        label = i, size = text.size)
-                plot <- plot + annotate("segment", x = x1 + adj.x.s, xend = x1, y = y1 + 
-                                                adj.y.s, yend = y1, size = segment.size)
-        }
-        return(plot)
-}
-
-LabelUR <- function(plot, genes, exp.mat, adj.u.t = 0.1, adj.r.t = 0.15, adj.u.s = 0.05, 
-                    adj.r.s = 0.05, ...) {
-        return(LabelPoint(plot, genes, exp.mat, adj.y.t = adj.u.t, adj.x.t = adj.r.t, 
-                          adj.y.s = adj.u.s, adj.x.s = adj.r.s, ...))
-}
-
-LabelUL <- function(plot, genes, exp.mat, adj.u.t = 0.1, adj.l.t = 0.15, adj.u.s = 0.05, 
-                    adj.l.s = 0.05, ...) {
-        return(LabelPoint(plot, genes, exp.mat, adj.y.t = adj.u.t, adj.x.t = -adj.l.t, 
-                          adj.y.s = adj.u.s, adj.x.s = -adj.l.s, ...))
-}
-
-Marker2Type <- function(gene,Cell_Type){
-        "Convert N gene vector into a NX2 dataframe.
-        Input 
-        gene: N gene vector
-        Cell_Type: vector name
-        
-        Output 
-        df: N by 2 dataframe with gene at column1 and Cell_Type at column2.
-        ---------------------------"
-        df <- data.frame(gene = gene,stringsAsFactors = F)
-        df$Cell_Type <- Cell_Type
-        return(df)
-}
-Marker2Types <- function(x){
-        "Convert a list of N gene vector into a NX2 dataframe.
-        Input 
-        x: list of N gene vector
-        
-        Output 
-        df: N by 2 dataframe with gene at column1 and Cell_Type at column2.
-        ---------------------------"
-        y <- lapply(seq_along(x), function(y, n, i) { Marker2Type(y[[i]],n[[i]]) }, y=x, n=names(x))
-        df <- do.call(rbind.data.frame, y)
-        return(df)
-}
-
-# MouseGenes
-# turn list of gene character to uniform mouse gene list format
-MouseGenes <- function(object,marker.genes,unique =F){
+# HumanGenes
+# turn list of gene character to uniform Human gene list format
+HumanGenes <- function(object, marker.genes, unique=FALSE){
         # marker.genes =c("Cdh5,Pecam1,Flt1,Vwf,Plvap,Kdr") for example
         if(missing(object)) 
-                stop("A seurat object must be provided first!")
+                stop("A seurat object must be provided first")
         if(class(object) != "seurat") 
-                stop("A seurat object must be provided first!")
+                stop("A seurat object must be provided first")
         if(missing(marker.genes)) 
+                stop("A list of marker genes must be provided")
+        if(object@var.genes[1]==Hmisc::capitalize(tolower(object@var.genes[1])))
+                stop("This is mouse genome, use MouseGenes() instead!")
+        
+        marker.genes <- as.character(marker.genes)
+        marker.genes <- unlist(strsplit(marker.genes,","))
+        marker.genes <- toupper(marker.genes)
+        marker.genes <- CaseMatch(search = marker.genes, match = rownames(x = object@raw.data))
+        if(unique) marker.genes <- unique(marker.genes)
+        print(length(marker.genes))
+        return(as.character(marker.genes))
+}
+
+
+# clean up the gene names for downstream analysis
+# turn list of gene character to uniform mouse gene list format
+#' @param object Seurat object
+#' @param marker.genes gene names, can be one gene or vector. Must be character
+#' @param unique TRUE/FALSE, output unique gene name or not
+#' @export marker.genes uniform mouse gene that exsit in object@data
+#' @example MouseGenes(mouse_eyes,c("Cdh5","Pecam1","Flt1"))
+MouseGenes <- function(object, marker.genes, unique =F){
+        # marker.genes =c("Cdh5,Pecam1,Flt1,Vwf,Plvap,Kdr") for example
+        if(missing(object))
+                stop("A seurat object must be provided first!")
+        if(class(object) != "seurat")
+                stop("A seurat object must be provided first!")
+        if(missing(marker.genes))
                 stop("A list of marker genes must be provided!")
         if(object@var.genes[1]==toupper(object@var.genes[1]))
                 stop("This is human genome, use HumanGenes() instead!")
@@ -992,18 +640,9 @@ randomStrings <- function(n = 5000) {
 
 # rename ident for certain cells only
 # cells.use is vector of cell name
-RenameIdent.1 <- function (object, old.ident.name = NULL, new.ident.name = NULL,
-                           cells.use = NULL) 
+RenameIdent.1 <- function (object, new.ident.name = NULL,cells.use = NULL) 
 {
-        if (!is.null(old.ident.name)) {
-                if(!old.ident.name %in% object@ident) {
-                        stop(paste("Error : ", old.ident.name, " is not a current identity class"))
-                }
-        }
         new.levels <- old.levels <- levels(x = object@ident)
-        if (new.ident.name %in% old.levels) {
-                new.levels <- new.levels[new.levels != old.ident.name]
-        }
         if (!(new.ident.name %in% old.levels)) {
                 new.levels <- c(new.levels,new.ident.name)
         }
@@ -1019,12 +658,12 @@ RenameIdent.1 <- function (object, old.ident.name = NULL, new.ident.name = NULL,
 # FeaturePlot doesn't return ggplot
 # SingleFeaturePlot doesn't take seurat object as input
 # modified SingleFeaturePlot, take seurat object and return ggplot
-SingleFeaturePlot.1 <- function (object = object, feature = feature, pt.size = 1.2,
+SingleFeaturePlot.1 <- function (object = object, feature = feature, pt.size = 1.0,
                                  dim.1 = 1, dim.2 = 2,pch.use = 16, cols.use  = c("lightgrey","blue"),
                                  gradient.use = c("orangered", "red4"),threshold=0.1,text.size=15,
                                  cells.use = NULL,dim.codes, min.cutoff = 0, max.cutoff = Inf,
                                  use.imputed = FALSE, reduction.use = "tsne",no.axes = FALSE, no.legend = TRUE, 
-                                 dark.theme = FALSE, do.return = FALSE) 
+                                 dark.theme = FALSE, do.return = FALSE,...) 
 {
         dim.code <- GetDimReduction(object = object, reduction.type = reduction.use, 
                                     slot = "key")
@@ -1039,7 +678,7 @@ SingleFeaturePlot.1 <- function (object = object, feature = feature, pt.size = 1
         data.plot$pt.size <- pt.size
         names(x = data.plot) <- c("x", "y")
         data.use <- t(x = FetchData(object = object, vars.all = feature, 
-                                    cells.use = cells.use, use.imputed = use.imputed))
+                                    cells.use = cells.use, use.imputed = use.imputed,...))
         data.gene <- na.omit(object = data.frame(data.use[1,])) # Error in data.use[feature, ] : subscript out of bounds
         min.cutoff <- Seurat:::SetQuantile(cutoff = min.cutoff, data = data.gene)
         max.cutoff <- Seurat:::SetQuantile(cutoff = max.cutoff, data = data.gene)
@@ -1071,11 +710,11 @@ SingleFeaturePlot.1 <- function (object = object, feature = feature, pt.size = 1
         if (brewer.gran != 2) {
                 if (length(x = cols.use) == 1) {
                         p <- p + geom_point(mapping = aes(color = col), 
-                                            size = pt.size, shape = pch.use) + scale_color_brewer(palette = cols.use)
+                                            size = pt.size, shape = pch.use)
                 }
                 else {
                         p <- p + geom_point(mapping = aes(color = col), 
-                                            size = pt.size, shape = pch.use) + scale_color_manual(values = cols.use)
+                                            size = pt.size, shape = pch.use)
                 }
         }
         else {
@@ -1087,9 +726,7 @@ SingleFeaturePlot.1 <- function (object = object, feature = feature, pt.size = 1
                 }
                 else {
                         p <- p + geom_point(mapping = aes(color = gene), 
-                                            size = pt.size, shape = pch.use) +
-                                scale_color_gradientn(colors = cols.use,
-                                                      guide = guide_colorbar(title = feature))
+                                            size = pt.size, shape = pch.use)
                 }
         }
         if (no.axes) {
@@ -1110,204 +747,52 @@ SingleFeaturePlot.1 <- function (object = object, feature = feature, pt.size = 1
                 p <- p + DarkTheme()
         }
         p$data <- p$data[order(p$data$gene),]
-        p <- customize_Seurat_Featureplot(p, alpha.use = 1,
-                                          scaled.expression.threshold = threshold,
-                                          gradient.use = gradient.use)
-        p <- p +ggtitle(feature)+
+        p1 <- ChangeColorScale(p, alpha.use = 1,
+                               scaled.expression.threshold = threshold,
+                               gradient.use = gradient.use)
+        p1 <- p1 +ggtitle(feature)+
                 theme(text = element_text(size=text.size),     #larger text including legend title							
                       axis.text.x = element_text(size=text.size*0.8),
                       axis.text.y = element_text(size=text.size*0.8),
                       plot.title = element_text(hjust = 0.5,size=text.size*1.5)) #title in middle
-        return(p)
+        return(p1)
 }
 
 
-SingleR.Subset.1 <- function (singler, subsetdata) 
-{
-        s = singler
-        if (!is.null(s$seurat)) {
-                s$seurat = SubsetData(s$seurat, colnames(s$seurat@data)[subsetdata])
-                subsetdata = unlist(lapply(s$seurat@cell.names, FUN = function(x) which(singler$singler[[1]]$SingleR.single$cell.names == 
-                                                                                                x)))
-        }
-        for (i in 1:length(s$singler)) {
-                s$singler[[i]]$SingleR.single$cell.names = s$singler[[i]]$SingleR.single$cell.names[subsetdata]
-                s$singler[[i]]$SingleR.clusters$cell.names = s$singler[[i]]$SingleR.clusters$cell.names[subsetdata]
-                s$singler[[i]]$SingleR.single$scores = s$singler[[i]]$SingleR.single$scores[subsetdata, 
-                                                                                            ]
-                s$singler[[i]]$SingleR.single$labels = as.matrix(s$singler[[i]]$SingleR.single$labels[subsetdata, 
-                                                                                                      ])
-                
-                if(length(s$singler[[i]]$SingleR.single$labels1)>1) {
-                        s$singler[[i]]$SingleR.single$labels1 = as.matrix(s$singler[[i]]$SingleR.single$labels1[subsetdata, 
-                                                                                                                ])}
-                s$singler[[i]]$SingleR.single$clusters$cl = s$singler[[i]]$SingleR.single$clusters$cl[subsetdata]
-                if (!is.null(s$singler[[i]]$SingleR.single.main)) {
-                        s$singler[[i]]$SingleR.single.main$cell.names = s$singler[[i]]$SingleR.single.main$cell.names[subsetdata]
-                        s$singler[[i]]$SingleR.clusters.main$cell.names = s$singler[[i]]$SingleR.clusters.main$cell.names[subsetdata]
-                        s$singler[[i]]$SingleR.single.main$scores = s$singler[[i]]$SingleR.single.main$scores[subsetdata, 
-                                                                                                              ]
-                        s$singler[[i]]$SingleR.single.main$labels = as.matrix(s$singler[[i]]$SingleR.single.main$labels[subsetdata, 
-                                                                                                                        ])
-                        if(length(s$singler[[i]]$SingleR.single$labels1)>1) {
-                                s$singler[[i]]$SingleR.single.main$labels1 = as.matrix(s$singler[[i]]$SingleR.single.main$labels1[subsetdata, 
-                                                                                                                          ])}
-                        s$singler[[i]]$SingleR.single.main$clusters$cl = s$singler[[i]]$SingleR.single.main$clusters$cl[subsetdata]
-                }
-        }
-        if (!is.null(s[["signatures"]])) {
-                s$signatures = s$signatures[subsetdata, ]
-        }
-        if (!is.null(s[["other"]])) {
-                s$other = s$other[subsetdata]
-        }
-        if (!is.null(s$meta.data)) {
-                s$meta.data$orig.ident = factor(as.character(s$meta.data$orig.ident[subsetdata]))
-                s$meta.data$xy = s$meta.data$xy[subsetdata, ]
-                s$meta.data$clusters = factor(as.character(s$meta.data$clusters[subsetdata]))
-        }
-        s
-}
-
-SingleR.PlotTsne.1 <- function (SingleR, xy, labels = SingleR$labels, clusters = NULL, 
-          do.letters = TRUE, dot.size = 1, do.labels = FALSE, do.legend = TRUE, 
-          label.size = 3, title = "", colors = singler.colors, font.size = NULL, 
-          alpha = 0.5,text.repel = TRUE, label.repel = FALSE,force=1) 
-{
-        # rewrite function to add label and legend
-        if (do.labels == TRUE) 
-                do.letters = FALSE
-        df = data.frame(row.names = SingleR$cell.names)
-        df$x = xy[, 1]
-        df$y = xy[, 2]
-        if (SingleR$method == "cluster") {
-                df$ident = clusters.map.values(clusters, labels)
-        }
-        else {
-                df$ident = as.factor(labels)
-        }
-        if (sum(levels(df$ident) %in% "Other")) {
-                lev = levels(df$ident)
-                df$ident = factor(df$ident, levels = c(lev[-which(lev %in% 
-                                                                          "Other")], "Other"))
-        }
-        num.levels = length(levels(df$ident))
-        if (num.levels < 0) 
-                colors = getcol(c(1:length(unique(labels))))
-        p = ggplot(df, aes(x = x, y = y,color = ident))
-        p = p + geom_point(aes(color = ident), size = dot.size, 
-                           alpha = alpha)
-        if (do.letters == TRUE) {
-                p = p + geom_point(aes(shape = as.character(ident), 
-                                       text = ident), size = dot.size/2)
-                p = p + scale_shape_identity()
-        }
-        else {
-        }
-        if (do.labels == TRUE) {
-                centers <- df %>% dplyr::group_by(ident) %>% dplyr::summarize(x = median(x), 
-                                                                       y = median(y))
-                p = p + geom_point(data = centers, aes(x = x, y = y), 
-                                   size = 0, alpha = 0)
-                if (label.repel == TRUE) {
-                        p = p + ggrepel::geom_label_repel(data = centers, 
-                                                          aes(label = ident),
-                                                          force = force)
-                }
-                else if (text.repel == TRUE){
-                        p = p + ggrepel::geom_text_repel(data = centers, aes(x = x,
-                                                                             y = y,
-                                                                             label = ident),
-                                                         force = force,
-                                                         inherit.aes = FALSE)     
-                        }
-                p = p + guides(colour = FALSE)
-                x.range = layer_scales(p)$x$range$range
-                add_to_x = sum(abs(x.range)) * 0.03
-                p = p + xlim(x.range[1] - add_to_x, x.range[2] + add_to_x)
-                if (num.levels > 35 & num.levels < 60) {
-                        p = p + theme(legend.position = "bottom", legend.direction = "vertical", 
-                                      legend.text = element_text(size = 6), legend.title = element_blank()) + 
-                                guides(col = guide_legend(ncol = 5))
-                }
-                else if (num.levels > 60) {
-                        p = p + theme(legend.position = "bottom", legend.direction = "vertical", 
-                                      legend.text = element_text(size = 6), legend.title = element_blank()) + 
-                                guides(col = guide_legend(ncol = 9))
-                }
-                else {
-                        p = p + theme(legend.text = element_text(size = font.size), 
-                                      legend.title = element_blank()) + guides(col = guide_legend(ncol = 1))
-                }
-        }
-        else {
-                if (is.null(font.size)) {
-                        font.size = 250 * (1/num.levels)
-                        font.size = max(font.size, 5)
-                        font.size = min(font.size, 10)
-                }
-                if (num.levels > 35 & num.levels < 60) {
-                        p = p + theme(legend.position = "bottom", legend.direction = "vertical", 
-                                      legend.text = element_text(size = 6), legend.title = element_blank()) + 
-                                guides(col = guide_legend(ncol = 5))
-                }
-                else if (num.levels > 60) {
-                        p = p + theme(legend.position = "bottom", legend.direction = "vertical", 
-                                      legend.text = element_text(size = 6), legend.title = element_blank()) + 
-                                guides(col = guide_legend(ncol = 9))
-                }
-                else {
-                        p = p + theme(legend.text = element_text(size = font.size), 
-                                      legend.title = element_blank()) + guides(col = guide_legend(ncol = 1))
-                }
-        }
-        p = p + scale_color_manual(name = "Type", values = colors)
-        p = p + xlab("tSNE 1") + ylab("tSNE 2") + ggtitle(title)
-        if (do.legend == FALSE) {
-                p = p + theme(legend.position = "none")
-        }
-        p = p + theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(), 
-                      panel.background = element_blank(), axis.line = element_line(colour = "black"))
-        out = list(p = p, df = df, num.levels = num.levels)
-}
-
-
-SplitCells <- function(object = object, split.by = "conditions"){
-        "
-        split seurat object by certein criteria
+#' Split seurat cell names by certein criteria
+#' A supporting funtion to SplitSeurat
+#' @param object Seurat object
+#' @param split.by the criteria to split, can be gene name, or any variable in meta.data
+#' @export cell.subsets list of subseted cell names by certein conditions, plus levels to split
+#' @example SplitCells(mouse_eyes, split.by = "conditions")
+SplitCells <- function(object = mouse_eyes, split.by = "conditions"){
         
-        Inputs
-        -------------------
-        object: aligned seurat object with labels at object@meta.data$
-        split.by: the criteria to split
-
-        Outputs
-        --------------------
-        cell.subsets: list of cell names splited by certein conditions,
-        plus levels of the conditions
-        "
-        cell.all <- FetchData(object,split.by)
-        Levels <- levels(cell.all[,1])
-        cell.subsets <- lapply(Levels, function(x) 
-                rownames(cell.all)[cell.all[,split.by] == x])
-        cell.subsets[[length(cell.subsets)+1]] <- Levels # record conditions in the last return
+        cell.all <- FetchData(object = object, vars.all = split.by)
+        if(class(cell.all[,1]) == "numeric"){
+                Levels = paste(c("Express no","Express"), split.by)
+                cell.subsets[[1]] <- rownames(cell.all)[cell.all[,split.by] == 0]
+                cell.subsets[[2]] <- rownames(cell.all)[cell.all[,split.by] > 0]
+                cell.subsets[[3]] <- Levels # record conditions in the last return
+        }
+        if(class(cell.all[,1]) == "factor"){
+                Levels <- levels(cell.all[,1])
+                cell.subsets <- lapply(Levels, function(x)
+                        rownames(cell.all)[cell.all[,split.by] == x])
+                cell.subsets[[length(cell.subsets)+1]] <- Levels # record conditions in the last return
+        }
         return(cell.subsets)
 }
 
-SplitSeurat <- function(object = object, split.by = "conditions"){
-        "
-        split seurat object by certein criteria
-        
-        Inputs
-        -------------------
-        object: aligned seurat object with labels at object@meta.data$
-        split.by: the criteria to split
 
-        Outputs
-        --------------------
-        object.subsets: list of subseted object by certein conditions,
-        plus levels of the conditions
-        "
+#' Split Seurat object by certein criteria
+#' A supporting funtion to SplitTSNEPlot
+#' @param object Seurat object
+#' @param split.by the criteria to split, can be gene name, or any variable in meta.data
+#' @export object.subsets list of subseted object by certein conditions,
+#' plus levels to be splited
+#' @example SplitCells(mouse_eyes, split.by = "conditions")
+SplitSeurat <- function(object = object, split.by = "conditions"){
+        
         cell.subsets <- SplitCells(object = object, split.by = split.by)
         
         object.subsets <- list()
@@ -1317,6 +802,7 @@ SplitSeurat <- function(object = object, split.by = "conditions"){
         object.subsets[[i+1]] <- cell.subsets[[i+1]] # record conditions in the last return
         return(object.subsets)
 }
+
 
 SplitSingler <- function(singler = singler, split.by = "conditions"){
         "
@@ -1329,62 +815,62 @@ SplitSingler <- function(singler = singler, split.by = "conditions"){
         
         Outputs
         --------------------
-        object.subsets: list of subseted singler object by certein conditions,
+        Singler.subsets: list of subseted singler object by certein conditions,
         plus levels of the conditions
         "
+        if(is.null(singler$seurat))
+                stop("A seurat object must be provided first, add singler$seurat = your_seurat_object")
         cell.subsets <- SplitCells(object = singler$seurat, split.by = split.by)
         
-        object.subsets <- list()
+        Singler.subsets <- list()
         for(i in 1:(length(cell.subsets)-1)){
                 cell.index <- which(singler$seurat@cell.names %in% cell.subsets[[i]])
-                object.subsets[[i]] <- SingleR.Subset.1(singler=singler,
-                                                               subsetdata =cell.index)
+                Singler.subsets[[i]] <- SingleR.Subset.1(singler=singler,
+                                                         subsetdata =cell.index)
         }
-        object.subsets[[i+1]] <- cell.subsets[[i+1]] # record conditions in the last return
-        return(object.subsets)
+        Singler.subsets[[i+1]] <- cell.subsets[[i+1]] # record conditions in the last return
+        return(Singler.subsets)
 }
 
-SplitTSNEPlot <- function(object = object, split.by = "conditions",
+
+#' Split Seurat by certein criteria and make tsne plot
+#' @param object Seurat object
+#' @param split.by the criteria to split, can be gene name, or any variable in meta.data
+#' @param select.plots output order, default to NULL. If want to change,use c(2,1) for example
+#' @param return.data TRUE/FASLE, return splited ojbect or not.
+#' @param ... all other parameters are inherited from Seurat::TSNEPlot()
+#' @export p ggplot object from TSNEplot
+#' @example SplitTSNEPlot(mouse_eyes, split.by = "conditions")
+#' @example SplitTSNEPlot(mouse_eyes, split.by = "Rlbp1", select.plots = c(2,1))
+SplitTSNEPlot <- function(object = mouse_eyes, split.by = "conditions",
                           select.plots = NULL, return.plots = FALSE,
                           do.label = T, group.by = "ident", no.legend = TRUE,
                           pt.size = 1,label.size = 5,... ){
-        "
-        split seurat object by certein criteria, and generate TSNE plot
         
-        Inputs
-        -------------------
-        object: aligned seurat object with labels at object@meta.data$
-        split.by: the criteria to split
-        range: number of output plots, default is all of them.
-        return.data: TRUE/FASLE, return splited ojbect or not.
-        
-        Outputs
-        --------------------
-        none: print TSNEplot
-        "
-        object.subsets <- SplitSingler(object = object, split.by = split.by)
-        conditions <- object.subsets[[length(object.subsets)]] # levels of conditions
+        object.subsets <- SplitSeurat(object = object, split.by = split.by)
+        levels <- object.subsets[[length(object.subsets)]]
         
         p <- list()
-        if(is.null(select.plots)) select.plots <- 1:length(conditions)
-        for(i in select.plots){ 
-                p[[i]] <- TSNEPlot(object = object.subsets[[i]],
-                                   do.label = do.label, group.by = group.by, 
+        if(is.null(select.plots)) select.plots <- 1:length(levels)
+        for(i in 1:length(select.plots)){
+                p[[i]] <- TSNEPlot(object = object.subsets[[select.plots[i]]],
+                                   do.label = do.label, group.by = group.by,
                                    do.return = T, no.legend = no.legend,
                                    pt.size = pt.size,label.size = label.size,...)+
-                        ggtitle(conditions[i])+
-                        theme(text = element_text(size=20),     #larger text including legend title							
+                        ggtitle(levels[select.plots[i]])+
+                        theme(text = element_text(size=20),     #larger text including legend title
                               plot.title = element_text(hjust = 0.5)) #title in middle
         }
         p <- p[lapply(p,length)>0] # remove NULL element
-        if(return.plots) return(p) else print(do.call(plot_grid, p))
+        if(return.plots) return(p) else print(do.call(cowplot::plot_grid, p))
 }
 
 
 SplitSingleR.PlotTsne <- function(singler = singler, split.by = "conditions",
                                   select.plots = NULL, return.plots = FALSE,
-                                  do.label= TRUE,do.letters = FALSE,show.subtype = TRUE,
-                                  label.size = 4, dot.size = 3,legend.size = NULL,... ){
+                                  do.label= TRUE,do.letters = FALSE,main =FALSE,
+                                  show.2nd =FALSE,label.size = 4, dot.size = 3,
+                                  legend.size = NULL,... ){
         "
         split singler by certein criteria, and generate TSNE plot
         
@@ -1401,106 +887,57 @@ SplitSingleR.PlotTsne <- function(singler = singler, split.by = "conditions",
         return.plots: if return.data = TRUE
         "
         object.subsets <- SplitSingler(singler = singler, split.by = "conditions")
-        conditions <- object.subsets[[length(object.subsets)]] # levels of conditions
+        levels <- object.subsets[[length(object.subsets)]]
         
         out <- list()
         p <- list()
-        if(is.null(select.plots)) select.plots <- 1:length(conditions)
+        if(is.null(select.plots)) select.plots <- 1:length(levels)
         sp = select.plots
-        if(show.subtype) st =1 else st =2
-        for(i in 1:length(select.plots)){ 
-                out[[i]] <- SingleR.PlotTsne.1(object.subsets[[sp[i]]]$singler[[st]]$SingleR.single,
-                                               object.subsets[[sp[i]]]$meta.data$xy,
+        if(main) main_or_sub = "SingleR.single.main" else main_or_sub = "SingleR.single"
+        if(show.2nd) st =2 else st =1
+        for(i in 1:length(select.plots)){
+                out[[i]] <- SingleR.PlotTsne.1(SingleR= object.subsets[[sp[i]]]$singler[[st]][[main_or_sub]],
+                                               xy = object.subsets[[sp[i]]]$meta.data$xy,
                                                do.label=do.label,do.letters = do.letters,
-                                               labels = object.subsets[[sp[i]]]$singler[[st]]$SingleR.single$labels,
+                                               labels = object.subsets[[sp[i]]]$singler[[st]][[main_or_sub]]$labels,
                                                label.size = label.size, dot.size = dot.size,...)
-                out[[i]]$p = out[[i]]$p +
-                        ggtitle(conditions[sp[i]])+
-                        theme(text = element_text(size=20),   #larger text including legend title							
-                              plot.title = element_text(hjust = 0.5))#title in middle
+                out[[i]] = out[[i]] +
+                        ggtitle(levels[sp[i]])+
+                        theme(text = element_text(size=20),							
+                              plot.title = element_text(hjust = 0.5))
                 if(!is.null(legend.size))
-                        out[[i]]$p = out[[i]]$p + theme(legend.text = element_text(size=legend.size))
-                p[[i]] = out[[i]]$p
+                        out[[i]] = out[[i]] + theme(legend.text = element_text(size=legend.size))
         }
         out <- out[lapply(out,length)>0] # remove NULL element
-        p <- p[lapply(p,length)>0] # remove NULL element
-        if(return.plots) return(out) else print(do.call(plot_grid, p))
+        if(return.plots) return(out) else print(do.call(plot_grid, out))
 }
 
 
-# find and print differentially expressed genes within all major cell types ================
-# combine SubsetData, FindAllMarkers, write.csv parallely
-
-SplitFindAllMarkers <- function(object,split.by = "conditions", write.csv = TRUE){
-        "
-        split seurat object by certein criteria, and find all markers+ UMI +adj_p
+# find and print differentially expressed genes within all major cell types
+# combine SubsetData, FindAllMarkers, write.csv
+#' @param object Seurat object
+#' @param split.by compatible to vars.all in Seurat::FetchData. If split.by is gene name,
+#' @param ... all paramethers are the same as Seurat::FindAllMarkers
+#' @export gde.all data frame
+#' @example FindAllMarkers.UMI(mouse_eyes)
+SplitFindAllMarkers <- function(object, split.by = "conditions", write.csv = TRUE,...){
         
-        Inputs
-        -------------------
-        object: aligned seurat object with labels at object@meta.data$
-        split.by: the criteria to split
-        write.csv: TRUE/FASLE, write csv files or not.
-        
-        Outputs
-        --------------------
-        object.markers: list of gene markers
-        "
         object.subsets <- SplitCells(object = object, split.by = split.by)
         conditions <- object.subsets[[length(object.subsets)]] # levels of conditions
         
         object.markers <- list()
         
-        for(i in 1:length(conditions)){ 
+        for(i in 1:length(conditions)){
                 object.markers[[i]] <- FindAllMarkers.UMI(object = object.subsets[[i]],
                                                           logfc.threshold = -Inf,
                                                           return.thresh = 1,
                                                           test.use = "bimod",
                                                           min.pct = -Inf,
                                                           min.diff.pct = -Inf,
-                                                          min.cells = -Inf)
-                if(write.csv) write.csv(object.markers[[i]], 
+                                                          min.cells = -Inf,...)
+                if(write.csv) write.csv(object.markers[[i]],
                                         file=paste0("./output/",
-                                                    deparse(substitute(object)), 
-                                                    "_",conditions[i],
-                                                    ".csv"))
-        }
-        return(object.markers)
-}
-
-
-# find and print differentially expressed genes within all major cell types ================
-# combine SubsetData, FindAllMarkers, write.csv parallely
-
-SplitFindAllMarkers <- function(object,split.by = "conditions", write.csv = TRUE){
-        "
-        split seurat object by certein criteria, and find all markers+ UMI +adj_p
-        
-        Inputs
-        -------------------
-        object: aligned seurat object with labels at object@meta.data$
-        split.by: the criteria to split
-        write.csv: TRUE/FASLE, write csv files or not.
-        
-        Outputs
-        --------------------
-        object.markers: list of gene markers
-        "
-        object.subsets <- SplitCells(object = object, split.by = split.by)
-        conditions <- object.subsets[[length(object.subsets)]] # levels of conditions
-        
-        object.markers <- list()
-        
-        for(i in 1:length(conditions)){ 
-                object.markers[[i]] <- FindAllMarkers.UMI(object = object.subsets[[i]],
-                                                          logfc.threshold = -Inf,
-                                                          return.thresh = 1,
-                                                          test.use = "bimod",
-                                                          min.pct = -Inf,
-                                                          min.diff.pct = -Inf,
-                                                          min.cells = -Inf)
-                if(write.csv) write.csv(object.markers[[i]], 
-                                        file=paste0("./output/",
-                                                    deparse(substitute(object)), 
+                                                    deparse(substitute(object)),
                                                     "_",conditions[i],
                                                     ".csv"))
         }
@@ -1642,16 +1079,19 @@ Types2Markers <- function(df, by = "Cell_Type"){
 
 
 TSNEPlot.1 <- function(object, do.label = FALSE, pt.size = 1, label.size = 4, 
-                       cells.use = NULL, colors.use = NULL, ...) 
+                       cells.use = NULL,colors.use = NULL, 
+                       text.repel = FALSE, label.repel = TRUE,force= 1,...) 
 {
         return(DimPlot.1(object = object, reduction.use = "tsne", 
                          cells.use = cells.use, pt.size = pt.size, do.label = do.label, 
-                         label.size = label.size, cols.use = colors.use, ...))
+                         label.size = label.size, cols.use = colors.use,
+                         text.repel = text.repel, label.repel = label.repel,force= force,...))
 }
 
-# find and print differentially expressed genes across conditions ================
-# combine SetIdent,indMarkers and avg_UMI
-
+#' Generate 3D TSNEplot
+#' @param object Seurat object after performing RunTSNE(dim.embed = 3)
+#' @param ... all other parameters are inherited from Seurat::TSNEPlot()
+#' @export p/p3 ggplot object from TSNEplot
 TSNEPlot.3D <- function (object, reduction.use = "tsne", dim.1 = 1, dim.2 = 2, dim.3 = 3,
                          cells.use = NULL, pt.size = 1, do.return = FALSE, do.bare = FALSE, 
                          cols.use = NULL, group.by = "ident", pt.shape = NULL, do.hover = FALSE, 
@@ -1779,10 +1219,17 @@ TSNEPlot.3D <- function (object, reduction.use = "tsne", dim.1 = 1, dim.2 = 2, d
                         return(p3)
                 }
         }
-        if (do.bare) {
-                print(p)
         }
-        else {
-                print(p3)
-        }
-        }
+
+#' test a matirx's max/median/min of row/column'
+testMMM <- function(x,MARGIN = 2) {
+        par(mfrow=c(3,1))
+        Max <- apply(x,MARGIN,max)
+        Median <- apply(x,MARGIN,median)
+        Min <- apply(x,MARGIN,min)
+        xlim = c(min(x),max(x))
+        hist(Max, xlim = xlim)
+        hist(Median, xlim = xlim)
+        hist(Min, xlim = xlim)
+        par(mfrow=c(1,1))
+}

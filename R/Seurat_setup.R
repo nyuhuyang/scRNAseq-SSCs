@@ -124,10 +124,11 @@ SSCs <- AddMetaData(object = SSCs, metadata = batchid, col.name = "batchid")
 table(SSCs@meta.data$batchid)
 head(x = SSCs@meta.data)
 #======1.6 batch-correct using ComBat =========================
-SingleFeaturePlot.1(SSCs,"nUMI",threshold=20000)
+SingleFeaturePlot.1(SSCs,"nUMI",threshold=15000)
 SingleFeaturePlot.1(SSCs,"batchid",threshold=1.0)
 SingleFeaturePlot.1(SSCs,"percent.mito",threshold=0.05)
 SingleFeaturePlot.1(SSCs,"CC.Difference",threshold=0.05)
+SingleFeaturePlot.1(SSCs,"nUMI",threshold=1)
 m = as.matrix(SSCs@data)
 m = m[rowSums(m)>0,]
 com = ComBat(m, batchid, prior.plots=FALSE, par.prior=TRUE)
@@ -137,7 +138,8 @@ saveRDS(SSCs@data, file = "./data/SSCs_data.Rda")
 #---------------------
 SSCs@data = readRDS("./data/Combat_data.Rda")
 SSCs@scale.data = NULL
-SSCs <- ScaleData(object = SSCs,genes.use = SSCs@var.genes, model.use = "negbinom", do.par=T,
+SSCs <- ScaleData(object = SSCs,genes.use = SSCs@var.genes,
+                  model.use = "negbinom", do.par=T,
                   vars.to.regress = c("CC.Difference"),#"CC.Difference","percent.mito"--nogood,"nUMI"--nogood
                   display.progress = T)
 SSCs@data =  readRDS("./data/SSCs_data.Rda")

@@ -8,6 +8,7 @@ library(Seurat)
 library(dplyr)
 library(Matrix)
 library(sva)
+library(SingleR)
 source("../R/Seurat_functions.R")
 ########################################################################
 #
@@ -34,7 +35,8 @@ for(i in 1:length(samples)){
         SSCs_Seurat[[i]] <- CreateSeuratObject(SSCs_raw[[i]],
                                                min.cells = 3,
                                                min.genes = 200,
-                                               names.delim = "_")
+                                               names.delim = "_",
+                                               project = "paula")
         SSCs_Seurat[[i]]@meta.data$conditions <- conditions[i]
 }
 SSCs <- Reduce(function(x, y) MergeSeurat(x, y, do.normalize = F), SSCs_Seurat)
@@ -45,17 +47,29 @@ SSCs <- FilterCells(SSCs, subset.names = "nGene",
         NormalizeData() %>%
         ScaleData(display.progress = FALSE) %>%
         FindVariableGenes(do.plot = FALSE, display.progress = FALSE)
-save(SSCs, file = "./data/SSCs_20180821.Rda")
+save(SSCs, file = "./data/SSCs_20180825.Rda")
 
 #======1.2 QC, pre-processing and normalizing the data=========================
-# Calculate median UMI per cell
+# 1.2.1 Calculate median UMI per cell
 SSCs_raw_data <- as.matrix(x = SSCs@raw.data)
 mean(colSums(SSCs_raw_data))
 median(colSums(SSCs_raw_data))
 min(colSums(SSCs_raw_data))
-#boxplot(colSums(SSCs_raw_data))
 remove(SSCs_raw_data);GC()
 
+# 1.2.2 Identifying Outlier Cells
+# Plot genes per cell
+# How many genes expressed per cells
+complexity.per.cell <- apply(SSCs@data, 2, function(x) sum(x>0))
+# Mean count per cell.
+mean.count.per.cell <- apply(SSCs@data, 2, function(x) mean(x))
+# Gene prevalence
+gene.prevalence <- apply(SSCs@raw.data, 1, function(x) sum(x>0))
+# Complexity by mean expression
+par(mfrow = c(2,1))
+plot(complexity.per.cell, mean.count.per.cell)
+
+# 1.2.3 calculate mitochondria percentage
 mito.genes <- grep(pattern = "^mt-", x = rownames(x = SSCs@data), value = TRUE)
 percent.mito <- Matrix::colSums(SSCs@raw.data[mito.genes, ])/Matrix::colSums(SSCs@raw.data)
 SSCs <- AddMetaData(object = SSCs, metadata = percent.mito, col.name = "percent.mito")
@@ -94,8 +108,8 @@ TSNEPlot(object = SSCs, do.label = F, group.by = "orig.ident",
         theme(text = element_text(size=15),							
               plot.title = element_text(hjust = 0.5,size = 18, face = "bold")) 
 
-save(SSCs, file = "./data/SSCs_20180821.Rda")
-Iname = load("./data/SSCs_20180821.Rda")
+save(SSCs, file = "./data/SSCs_20180825.Rda")
+Iname = load("./data/SSCs_20180825.Rda")
 
 #======1.4 Add Cell-cycle score =========================
 # Read in a list of cell cycle markers, from Tirosh et al, 2015
@@ -116,29 +130,29 @@ head(x = SSCs@meta.data)
 
 #======1.5 Add batch id =========================
 batchname = SSCs@meta.data$orig.ident
-batchid = rep(NA,length(batchname))
-batchid[batchname %in% c("PND14","PND18","PND18pre","PND30")] = 1
-batchid[batchname %in% c("PND06","PND25","Ad-depleteSp","Ad-Thy1")] = 2
-names(batchid) = rownames(SSCs@meta.data)
-SSCs <- AddMetaData(object = SSCs, metadata = batchid, col.name = "batchid")
-table(SSCs@meta.data$batchid)
+batch.effect = rep(NA,length(batchname))
+batch.effect[batchname %in% c("PND14","PND18","PND18pre","PND30")] = 1
+batch.effect[batchname %in% c("PND06","PND25","Ad-depleteSp","Ad-Thy1")] = 2
+names(batch.effect) = rownames(SSCs@meta.data)
+SSCs <- AddMetaData(object = SSCs, metadata = batch.effect, col.name = "batch.effect")
+table(SSCs@meta.data$batch.effect)
 head(x = SSCs@meta.data)
 #======1.6 batch-correct using ComBat =========================
 SingleFeaturePlot.1(SSCs,"nUMI",threshold=15000)
-SingleFeaturePlot.1(SSCs,"batchid",threshold=1.0)
+SingleFeaturePlot.1(SSCs,"batch.effect",threshold=1.0)
 SingleFeaturePlot.1(SSCs,"percent.mito",threshold=0.05)
 SingleFeaturePlot.1(SSCs,"CC.Difference",threshold=0.05)
-SingleFeaturePlot.1(SSCs,"nUMI",threshold=1)
 m = as.matrix(SSCs@data)
 m = m[rowSums(m)>0,]
-com = ComBat(m, batchid, prior.plots=FALSE, par.prior=TRUE)
+com = ComBat(m, batch.effect, prior.plots=FALSE, par.prior=TRUE)
 #----save files just in case------
 saveRDS(Matrix(as.matrix(com)), file = "./data/Combat_data.Rda")
 saveRDS(SSCs@data, file = "./data/SSCs_data.Rda")
+remove(m,com);GC()
 #---------------------
 SSCs@data = readRDS("./data/Combat_data.Rda")
 SSCs@scale.data = NULL
-SSCs <- ScaleData(object = SSCs,genes.use = SSCs@var.genes,
+SSCs <- ScaleData(object = SSCs,#genes.use = SSCs@var.genes,
                   model.use = "negbinom", do.par=T,
                   vars.to.regress = c("CC.Difference"),#"CC.Difference","percent.mito"--nogood,"nUMI"--nogood
                   display.progress = T)
@@ -157,11 +171,11 @@ SSCs <- FindClusters(object = SSCs, reduction.type = "pca", dims.use = 1:30, res
 SSCs <- RunTSNE(object = SSCs, reduction.use = "pca", dims.use = 1:30, 
                 do.fast = TRUE, perplexity= 30)
 #SSCs@meta.data$orig.ident <- gsub("PND18pre","PND18",SSCs@meta.data$orig.ident)
-TSNEPlot(object = SSCs, do.label = F, group.by = "orig.ident", 
-         do.return = TRUE, no.legend = T,# colors.use = singler.colors,
+TSNEPlot.1(object = SSCs, do.label = F, group.by = "ident", 
+         do.return = TRUE, no.legend = T, colors.use = singler.colors,
          pt.size = 1,label.size = 8 )+
         ggtitle("TSNEPlot of all samples")+
         theme(text = element_text(size=15),							
               plot.title = element_text(hjust = 0.5,size = 18, face = "bold")) 
 
-save(SSCs, file = "./data/SSCs_20180822.Rda")
+save(SSCs, file = "./data/SSCs_20180825.Rda")

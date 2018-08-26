@@ -109,3 +109,28 @@ TSNEPlot.1(object = SSCs,do.label = T, group.by = "ident",
               plot.title = element_text(hjust = 0.5, face = "bold"))
 
 save(SSCs, file = "./data/SSCs_20180822.Rda")
+
+#------- 2.6 Store cell names by identities------------------------
+#' convert cell.names ~ ident into a list of cell.name by ident
+#' @param cell.names cell names in seurat.object@cell.names
+#' @param ident cluster name or cell type in seurat.object@ident
+#' @export labels_id A list of cell.names with ident as names
+factor2list <- function(cell.names, ident){
+        
+        head(labels <- data.frame(cell.names = cell.names,
+                                  ident = ident,
+                                  stringsAsFactors = F))
+        labels_tab <- labels %>% table() %>% as.data.frame.matrix()
+        cell.names = rownames(labels_tab)
+        labels_tab <- apply(labels_tab,2, as.logical) %>% as.data.frame()
+        labels_id <- apply(labels_tab,2, function(x) cell.names[x])
+        
+        return(labels_id)
+}
+
+singler.labels <- singler$singler[[1]]$SingleR.single.main$labels
+head(singler_labels_id <- factor2list(cell.names = rownames(singler.labels),
+                                      ident = singler.labels[,1]),3)
+save(singler_labels_id, file="./output/singler_labels.RData")
+head(SSC_labels_id <- factor2list(cell.names = names(SSCs@ident),
+                                  ident = as.character(SSCs@ident)),3)

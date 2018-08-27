@@ -179,9 +179,9 @@ RenameIdent.2 <- function(object, new.ident.name, cells.use){
         return(object)
 }
 
-new.types <- c("Early Spermatocytes")
+new.types <- c("Spermatogonia")
 for(new.type in new.types) {
-        SSCs = ReplaceDupCells(object = SSCs,
+        SSCs = RenameIdent.2(object = SSCs,
                                new.ident.name = new.type,
                                cells.use = SSC_labels_id[[new.type]])
         }
@@ -199,7 +199,9 @@ SSC_labels_id <- factor2list(cell.names = names(SSCs@ident),
 saveRDS(SSC_labels_id, file = "./output/SSC_labels_20180825.Rda")
 save(SSCs, file = "./data/SSCs_20180825.Rda")
 
-#====== 3.6 summary =========================
+SSC_labels_id = readRDS(file = "./output/SSC_labels_20180825.Rda")
+
+#====== 3.6 SubsetData SSCs_Spermato =========================
 # total cell number
 dev_order <- c("Spermatogonia","Early Spermatocytes","Spermatocytes",
                  "Round Spermatids","Spermatids")
@@ -208,10 +210,10 @@ SSCs_Spermato@meta.data$orig.ident = sub("PND18pre","PND18",SSCs_Spermato@meta.d
 SSCs_Spermato@meta.data$orig.ident = sub("Ad-","zAd-",SSCs_Spermato@meta.data$orig.ident)
 #SSCs_Spermato@meta.data$orig.ident = sub("zAd-","Ad-",SSCs_Spermato@meta.data$orig.ident)
 
-TSNEPlot.1(object = SSCs_Spermato,do.label = T, group.by = "orig.ident", 
-           do.return = TRUE, no.legend = T, #colors.use = singler.colors[4:8],
+TSNEPlot.1(object = SSCs_Spermato,do.label = T, group.by = "ident", 
+           do.return = TRUE, no.legend = T, colors.use = singler.colors[4:8],
            pt.size = 1,label.size = 5,label.repel = T,force=1)+
-        ggtitle("Germ cells at different time points")+
+        ggtitle("Germ cells only")+
         theme(text = element_text(size=20),							
               plot.title = element_text(hjust = 0.5,size=18, face = "bold"))
 

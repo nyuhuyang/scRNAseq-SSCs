@@ -10,58 +10,26 @@ library(kableExtra)
 library(SingleR)
 library(reshape2)
 library(MAST)
+library(topGO)
 source("../R/Seurat_functions.R")
 source("../R/SingleR_functions.R")
 
+
 # 4.1 load data & Rename ident, Compare DE across all major cell types=========================
-# 4.1.1 load data
-lname1 = load(file = "./data/SSCs_20180822.Rda");lname1
+# 4.1.1 load data ==============
+lname1 = load(file = "./data/SSCs_20180825.Rda");lname1
 SSCs@meta.data$orig.ident = gsub("PND18pre","PND18",SSCs@meta.data$orig.ident)
 table(SSCs@meta.data$orig.ident)
 table(SSCs@ident)
-idents <- as.data.frame(table(SSCs@ident))
-old.ident.ids <- idents$Var1
-new.cluster.ids <- c("Sertoli cells",
-                    "Spermatocytes",
-                    "Spermatids",
-                    "Spermatogonia",
-                    "Spermatocytes",
-                    "Spermatogonia",
-                    "Spermatids",
-                    "Spermatocytes",
-                    "Spermatogonia",
-                    "Spermatocytes",
-                    "Spermatids",
-                    "Spermatids",
-                    "Early Spermatocytes",
-                    "Sertoli cells",
-                    "Spermatocytes",
-                    "Smooth muscle",
-                    "Endothelial & Hematopoietic cells",
-                    "Endothelial & Hematopoietic cells",
-                    "Spermatocytes",
-                    "Spermatocytes",
-                    "Sertoli cells",
-                    "Endothelial & Hematopoietic cells",
-                    "Early Spermatocytes",
-                    "Endothelial & Hematopoietic cells",
-                    "Smooth muscle")
-
-SSCs@ident <- plyr::mapvalues(x = SSCs@ident,
-                                from = old.ident.ids,
-                                to = new.cluster.ids)
-major_cells <- c("Spermatogonia","Early Spermatocytes","Spermatocytes","Spermatids","Sertoli cells",
-"Smooth muscle","Endothelial & Hematopoietic cells")
-SSCs@ident <- factor(x = SSCs@ident, levels = major_cells) # Relevel object@ident
 
 TSNEPlot.1(object = SSCs,do.label = T, group.by = "ident",
-            do.return = TRUE, no.legend = T,colors.use = singler.colors[10:16],
+            do.return = TRUE, no.legend = T,colors.use = singler.colors,
             pt.size = 1,label.size = 5,label.repel = T)+
             ggtitle("Manually label cell types")+
             theme(text = element_text(size=20),
             plot.title = element_text(hjust = 0.5, face = "bold"))
 
-# 4.1.1 Compare DE across all cell types
+# 4.1.2 Compare DE across all cell types ==============
 All_markers <- FindAllMarkers.UMI(SSCs,test.use = "MAST")
 kable(All_markers[1:20,]) %>% kable_styling()
 rownames(All_markers) = NULL
@@ -75,9 +43,11 @@ All_markers <- All_markers %>% select("gene", everything()) # Moving the last co
 #' @example 
 #' major_cells <- c("Spermatogonia","Early Spermatocytes","Spermatocytes","Spermatids")
 #' top <- group_top(df = All_markers, major_cells)
-group_top_mutate <- function(df, ..., Top_n = 200){
-        new.col = deparse(substitute(time_points))
-        new.order = assign(new.col,time_points)
+group_top_mutate <- function(df, ..., Top_n = 500){
+        rownames(df) = NULL
+        df <- df %>% select("gene", everything()) # Moving the last column to the start
+        new.col = deparse(substitute(...))
+        new.order = assign(new.col,...)
         if(class(df) != "data.frame") df = as.data.frame(df)
         top <-  df %>% 
                 select("gene", everything()) %>%
@@ -89,51 +59,47 @@ group_top_mutate <- function(df, ..., Top_n = 200){
         return(as.data.frame(top))
 }
 
-top <- group_top(df = All_markers, major_cells)
-top %>% head(20) %>% kable() %>% kable_styling()
-write.csv(top,"./output/20180824/All_markers.csv")
+#' DoHeatmap.1, automatically group_top by cluster, order by Time_points
+DoHeatmap.1 <- function(object, marker_df,Top_n = 10, group.order,ident.use,
+                        group.label.rot =T,cex.row = 8,remove.key =T,use.scaled = T,
+                        group.cex = 13,title.size = 14){
+        top <-  marker_df %>% group_by(cluster) %>% top_n(Top_n, avg_logFC)
+        DoHeatmap(object = object, genes.use = top$gene, 
+                  group.order = group.order, use.scaled = use.scaled,
+                  slim.col.label = TRUE, remove.key = remove.key,cex.row = cex.row,
+                  group.cex = group.cex, rotate.key = T,group.label.rot = group.label.rot)+
+                ggtitle(paste("Expression heatmap of top",Top_n,
+                              "differential expression genes in each time points for",
+                              ident.use))+
+                theme(text = element_text(size=20),     							
+                      plot.title = element_text(hjust = 0.5,size=title.size))
+}
 
+major_cells <- c("Spermatogonia","Early Spermatocytes","Spermatocytes",
+                 "Round Spermatids","Spermatids","Sertoli cells",
+                 "Endothelial & Hematopoietic cells", "Smooth muscle")
+top <- group_top_mutate(df = All_markers, major_cells)
+top %>% head(20) %>% kable() %>% kable_styling()
+DoHeatmap.1(SSCs,top,Top_n = 15, 
+            group.order = major_cells,ident.use = "all cell types",
+            group.label.rot = T,cex.row = 5,remove.key =T)
+top <- select(top,-cluster)
+write.csv(top,"./output/20180826/All_markers.csv")
+
+# 4.1.3 GO enrichment analysis ==============
+Spermatogonia_markers <- All_markers[All_markers$cluster == "Spermatogonia",]
+Spermatogonia_markers <- Spermatogonia_markers[abs(Spermatogonia_markers$avg_logFC) > 1,"gene"]
+fg.genes <- unique(Spermatogonia_markers) # Takes all the unique cell type specific genes
+bg.genes = rownames(SSCs@data)
+GOterms.bc = topGOterms(fg.genes = SSCs.cell.type.genes,
+                        bg.genes = rownames(SSCs@data),
+                        organism =  "Mouse")
 
 #====== 4.2 SubsetData, Compare DE across all major cell types==================
-# 4.2.1 SubsetData
-dev_order <- c("Spermatogonia","Early Spermatocytes","Spermatocytes","Spermatids")
-SSCs_Spermato = SubsetData(SSCs,ident.use = dev_order)
-SSCs_Spermato@ident <- factor(x = SSCs_Spermato@ident, levels = rev(dev_order))
-TSNEPlot.1(object = SSCs_Spermato,do.label = T, group.by = "orig.ident",
-            do.return = TRUE, no.legend = T,#colors.use = singler.colors[11:14],
-            pt.size = 1,label.size = 5,label.repel = T)+
-            ggtitle("Germ cells only")+
-            theme(text = element_text(size=20),
-            plot.title = element_text(hjust = 0.5, face = "bold"))
-remove(SSCs);GC()
-table(SSCs_Spermato@ident)
 
-ident.use <- SSCs_Spermato@meta.data$orig.ident
-ident.use = gsub("PND18pre","PND18",ident.use)
-ident.use = as.factor(ident.use)
-names(ident.use) = SSCs_Spermato@cell.names
-SSCs_Spermato@ident <- ident.use
-TSNEPlot.1(object = SSCs_Spermato,do.label = T, group.by = "ident",
-           do.return = TRUE, no.legend = T,#colors.use = singler.colors[11:14],
-           pt.size = 1,label.size = 5,label.repel = T)+
-        ggtitle("Germ cells at different time points")+
-        theme(text = element_text(size=20),
-              plot.title = element_text(hjust = 0.5, face = "bold"))
+# 4.2.0. define pipeline ==============
 
-# 4.2.2 Compare DE across all germ cell types
-Dev_markers <- FindAllMarkers.UMI(SSCs_Spermato,test.use = "MAST")
-kable(Dev_markers[1:20,]) %>% kable_styling()
-rownames(Dev_markers) = NULL
-Dev_markers <- Dev_markers %>% select("gene", everything()) # Moving the last column to the start
-time_points <- c("PND06","PND14","PND18","PND25","PND30","Ad-depleteSp","Ad-Thy1")
-
-
-top <- group_top(df = Dev_markers, time_points)
-top %>% head(20) %>% kable() %>% kable_styling()
-write.csv(top,"./output/20180823/Dev_markers.csv")
-
-# 4.2.3. find DE genes among different day==============
-#' renameIdent + FindAllMarkers + group_top + write.csv
+#' pipeline renameIdent + FindAllMarkers + group_top + write.csv
 #' @param object A Seurat object
 #' @param ident.use Create a cell subset based on the provided identity classes, inherited from Seurat::SubsetData
 #' @param ... Name-value pairs of expressions, inherited from ... in dplyr::mutate
@@ -149,14 +115,17 @@ write.csv(top,"./output/20180823/Dev_markers.csv")
 #'                       replace.from = "PND18|PND25|PND30",
 #'                       replace.to = "PND18-30",
 #'                       Top_n=300)
-RenameIdent_FindAllMarkers <- function(object,ident.use, ..., merge = FALSE,
-                                       replace.from, replace.to,Top_n=300){
+RenameIdent_FindAllMarkers <- function(object,ident.use, ...,
+                                       replace.from = NULL,
+                                       replace.to,Top_n=300){
         # merge ident
-        if(merge) {
+        if(!is.null(replace.from)) {
                 object@meta.data$orig.ident = sub(replace.from,
                                                       replace.to,
                                                       object@meta.data$orig.ident)
         }
+        # Top_n = NULL, save all genes
+        if(is.null(Top_n)) Top_n = nrow(object@data)
         # rename ident
         new.levels = deparse(substitute(...))
         new.order = assign(new.levels,...)
@@ -178,73 +147,89 @@ RenameIdent_FindAllMarkers <- function(object,ident.use, ..., merge = FALSE,
         # FindAllMarkers
         object_develop <- FindAllMarkers.UMI(object,test.use = "MAST")
         object_develop <- group_top_mutate(df = object_develop, time_points,Top_n = Top_n)
-        print(head(object_develop))
         object_develop_remove_cluster <- object_develop %>% subset(select = -cluster)
+        print(head(object_develop))
         path <- paste("./output",gsub("-","",Sys.Date()),sep = "/")
         dir.create(path, recursive = T)
         write.csv(object_develop_remove_cluster,file= paste0(path,"/",ident.use,"_develop.csv"))
         return(list(object, object_develop, g))
 }
 
-DoHeatmap.1 <- function(object, marker_df,Top_n = 10, Time_points,ident.use,
-                        group.label.rot =T,cex.row = 8,remove.key =T,use.scaled = F,
-                        group.cex = 13){
-        top <-  marker_df %>% group_by(cluster) %>% top_n(Top_n, avg_logFC)
-        DoHeatmap(object = object, genes.use = top$gene, 
-                  group.order = Time_points, use.scaled = use.scaled,
-                  slim.col.label = TRUE, remove.key = remove.key,cex.row = cex.row,
-                  group.cex = group.cex, rotate.key = T,group.label.rot = group.label.rot)+
-                ggtitle(paste("Expression heatmap of top",Top_n,
-                              "differential expression genes in each time points for",
-                              ident.use))+
-                theme(text = element_text(size=20),     							
-                      plot.title = element_text(hjust = 0.5))
-}
-
-# Spermatogonia-----
+# 4.2.1 SSCs-spermato ==============
+SSCs_spermato <- SubsetData(SSCs,ident.use = major_cells[1:5])
+SSCs_spermato_markers <- top[(top$cluster %in% major_cells[1:5]),]
+DoHeatmap.1(SSCs_spermato,SSCs_spermato_markers,Top_n = 20, 
+            group.order = major_cells[1:5],ident.use = "all germ cells",
+            group.label.rot = T,cex.row = 6,remove.key =T)
+#-----
+SSCs_spermato <- SubsetData(SSCs,ident.use = major_cells[1:3])
+SSCs_spermato_markers <- top[(top$cluster %in% major_cells[1:3]),]
+DoHeatmap.1(SSCs_spermato,SSCs_spermato_markers,Top_n = 25,
+            group.order = major_cells[1:3],ident.use = "Spermatogonia and Spermatocytes",
+            group.label.rot = T,cex.row = 8,remove.key =T, title.size = 12)
+# 4.2.2 Spermatogonia ==============
 Spermatogonia <- SubsetData(SSCs,ident.use = "Spermatogonia")
 table(Spermatogonia@meta.data$orig.ident)
-time_points <- c("PND06","PND14","PND18-30","Ad-depleteSp","Ad-Thy1")
+time_points <- c("PND06","PND14","PND18","PND25-30","Ad-depleteSp","Ad-Thy1")
 Spermatogonia_list <- RenameIdent_FindAllMarkers(object = Spermatogonia,
                                                 ident.use = "Spermatogonia",
                                                 time_points,
-                                                merge = T,
-                                                replace.from = "PND18|PND25|PND30",
-                                                replace.to = "PND18-30",
+                                                replace.from = "PND25|PND30",
+                                                replace.to = "PND25-30",
                                                 Top_n=300)
 Spermatogonia_list[[3]]
 table(Spermatogonia_list[[1]]@ident) %>% t() %>% kable() %>% kable_styling()
 Spermatogonia_list[[2]] %>% group_by(cluster) %>% top_n(5,avg_logFC)%>% kable() %>% kable_styling()
 DoHeatmap.1(Spermatogonia_list[[1]],Spermatogonia_list[[2]],Top_n = 15, 
-            Time_points = time_points,ident.use = "Spermatogonia",
-            group.label.rot = T,cex.row = 8,remove.key =T)
+            group.order = time_points,ident.use = "Spermatogonia",
+            group.label.rot = T,cex.row = 8,remove.key =F)
+VlnPlot(object = Spermatogonia_list[[1]], features.plot = c("percent.mito"), nCol = 1,
+        group.by = "orig.ident", x.lab.rot = T, do.return = T)
 
-# Early_spermatocytes_list --------
+# add genes for 8/24 email
+marker = MouseGenes(Spermatogonia,c("Gfra1", "Zbtb16", "Nanos2", "Utf1", "Sall4",
+                                    "Id4", "Sohlh1", "Kit", "Lin28a", "Pax7", "Dmrt1"))
+top <-  Spermatogonia_list[[2]] %>% group_by(cluster) %>% top_n(15, avg_logFC)
+DoHeatmap(object = Spermatogonia_list[[1]], 
+          genes.use = c(marker,"Odf2", top$gene), slim.col.label = TRUE,
+          group.order = time_points, group.label.rot = T,cex.row = 6,remove.key =T) +
+        ggtitle(paste("Expression heatmap of top",15,
+                      "differential expression genes in each time points for",
+                      "Spermatogonia"))+
+        theme(text = element_text(size=20),     							
+              plot.title = element_text(hjust = 0.5,size=14))
+
+
+# 4.2.3 Early_spermatocytes ==============
 Early_Spermatocytes <- SubsetData(SSCs,ident.use = "Early Spermatocytes")
 table(Early_Spermatocytes@meta.data$orig.ident)
-time_points <- c("PND06","PND14","PND18","PND25","PND30_and_later")
+cells.use = Early_Spermatocytes@cell.names[!(Early_Spermatocytes@meta.data$orig.ident %in% c("Ad-Thy1",
+                                                                                             "PND06"))]
+Early_Spermatocytes <- SubsetData(SSCs,cells.use = cells.use)
+table(Early_Spermatocytes@meta.data$orig.ident)
+time_points <- c("PND14","PND18","PND25-30","Ad-depleteSp")
 Early_spermatocytes_list <- RenameIdent_FindAllMarkers(Early_Spermatocytes,
-                                                        ident.use = "Early spermatocytes",
+                                                       ident.use = "Early spermatocytes",
                                                        time_points,
-                                                        merge = T,
-                                                        replace.from = "PND30|Ad-depleteSp|Ad-Thy1",
-                                                        replace.to = "PND30_and_later",
+                                                       replace.from = "PND25|PND30",
+                                                       replace.to = "PND25-30",
                                                        Top_n=300)
 table(Early_spermatocytes_list[[1]]@ident) %>% t() %>% kable() %>% kable_styling()
-DoHeatmap.1(Early_spermatocytes_list[[1]],Early_spermatocytes_list[[2]],Top_n = 15, 
-            Time_points  = time_points,
+DoHeatmap.1(Early_spermatocytes_list[[1]],Early_spermatocytes_list[[2]],Top_n = 20, 
+            group.order  = time_points,
             ident.use = "Early spermatocytes")
 
-#  Spermatocytes-----
+
+# 4.2.4 Spermatocytes ==============
 Spermatocytes <- SubsetData(SSCs,ident.use = "Spermatocytes")
 table(Spermatocytes@meta.data$orig.ident)
 time_points <- c("PND14","PND18","PND25","PND30","Ad-depleteSp","Ad-Thy1")
 Spermatocytes_list <- RenameIdent_FindAllMarkers(Spermatocytes,
                                                 ident.use = "Spermatocytes",
                                                 time_points,
-                                                Top_n=300)
+                                                Top_n=400)
 DoHeatmap.1(Spermatocytes_list[[1]],Spermatocytes_list[[2]],Top_n = 10, 
-            Time_points <- time_points,ident.use <- "Spermatocytes")
+            group.order = time_points,ident.use = "Spermatocytes",title.size = 14)
 table(Spermatocytes_list[[1]]@ident) %>% t() %>% kable() %>% kable_styling()
 
 
@@ -259,8 +244,8 @@ Spermatids_list <- RenameIdent_FindAllMarkers(Spermatids,
                                               replace.from = "PND18|PND25",
                                               replace.to = "PND25_and_early")
 DoHeatmap.1(Spermatids_list[[1]],Spermatids_list[[2]],Top_n = 10, 
-            Time_points <- time_points,
-            ident.use <- "Spermatids")
+            group.order = time_points,
+            ident.use = "Spermatids")
 table(Spermatocytes_list[[1]]@ident) %>% t() %>% kable() %>% kable_styling()
 
 # Step 3. find overlap gene===========================

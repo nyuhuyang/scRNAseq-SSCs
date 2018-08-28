@@ -87,14 +87,24 @@ top <- select(top,-cluster)
 write.csv(top,"./output/20180826/All_markers.csv")
 
 # 4.1.3 GO enrichment analysis ==============
-Spermatogonia_markers <- All_markers[All_markers$cluster == "Spermatogonia",]
-Spermatogonia_markers <- Spermatogonia_markers[abs(Spermatogonia_markers$avg_logFC) > 1,"gene"]
-fg.genes <- unique(Spermatogonia_markers) # Takes all the unique cell type specific genes
-bg.genes = rownames(SSCs@data)
-GOterms.bc = topGOterms(fg.genes = SSCs.cell.type.genes,
-                        bg.genes = rownames(SSCs@data),
-                        organism =  "Mouse")
+All_markers = read.csv("./output/20180826/All_markers.csv", header = T,stringsAsFactors =F)
+Spermatogonia_markers <- All_markers[All_markers$major_cells == "Spermatogonia",]
+Spermatogonia_markers <- Spermatogonia_markers[abs(Spermatogonia_markers$avg_logFC) > 0.75,"gene"]
+length(unique(Spermatogonia_markers))
+library(biomaRt)
+# collect gene names from biomart
+mart <- biomaRt::useMart("ensembl",dataset="mmusculus_gene_ensembl")
+# Get ensembl gene ids and GO terms
+getBM <- biomaRt::getBM(attributes = c("external_gene_name", "go_id"),
+                        filters= "external_gene_name",
+                        values = rownames(SSCs@data),
+                        mart = mart)
 
+Spermatogonia.Go <-  topGOterms(int.genes = unique(Spermatogonia_markers),
+                                bg.genes = rownames(SSCs@data),
+                                organism =  "Mouse",
+                                getBM = getBM)
+Spermatogonia.Go %>% kable() %>% kable_styling()
 #====== 4.2 SubsetData, Compare DE across all major cell types==================
 
 # 4.2.0. define pipeline ==============

@@ -82,11 +82,11 @@ SSCs <- FilterCells(object = SSCs, subset.names = c("nGene","nUMI","percent.mito
                     high.thresholds = c(8000,125000, 0.15))
 
 par(mfrow = c(2, 1))
-GenePlot(object = SSCs, gene1 = "nUMI", gene2 = "percent.mito")
-GenePlot(object = SSCs, gene1 = "nUMI", gene2 = "nGene")
+GenePlot(object = SSCs, gene1 = "nUMI", gene2 = "percent.mito",use.raw = T)
+GenePlot(object = SSCs, gene1 = "nUMI", gene2 = "nUMI",use.raw = T)
 
-g2 <- VlnPlot(object = SSCs, features.plot = c("nGene", "nUMI", "percent.mito"), nCol = 1,
-              group.by = "orig.ident", x.lab.rot = T, do.return = T)
+VlnPlot(object = SSCs, features.plot = c("nUMI"), nCol = 1,
+              group.by = "ident", x.lab.rot = T, do.return = T)
 plot_grid(g1,g2)
 # After removing unwanted cells from the dataset, the next step is to normalize the data.
 SSCs <- NormalizeData(object = SSCs, normalization.method = "LogNormalize", 

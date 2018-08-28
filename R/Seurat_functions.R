@@ -467,24 +467,16 @@ GC <- function()
         }
 }
 
-##
+#' Extract ColorHexa from Seurat TSNE plot
+#' @param object aligned seurat object with ident
+#' @param return.vector TRUE/return full color vector, FALSE/return color levels
+#' @param cells.use only return ColorHexa of selected cells
+#' @param ... other TSNEPlot inputs 
+#' @export colors: color vector named by cell ID
 gg_colors <- function(object = object, return.vector=FALSE, cells.use = NULL,
                       no.legend = TRUE, do.label = TRUE,
                       do.return = TRUE, label.size = 6, gg_title="", ...){
-        "
-        Extract ColorHexa from Seurat TSNE plot
         
-        Inputs
-        -------------------
-        object: aligned seurat object with ident
-        return.vector: TRUE/return full color vector, FALSE/return color levels
-        cells.use: only return ColorHexa of selected cells
-        other TSNEPlot inputs 
-        
-        Outputs
-        --------------------
-        colors: color vector named by cell ID
-        "
         g1 <- Seurat::TSNEPlot(object = object, no.legend = no.legend,
                                do.label = do.label,do.return = do.return,
                                label.size = label.size,...)+
@@ -583,7 +575,7 @@ GenePlot.1 <- function (object, gene1, gene2, cell.ids = NULL, col.use = NULL,
 }
 
 # HumanGenes
-# turn list of gene character to uniform Human gene list format
+# turn list of gene character to uniformed Human gene list format
 HumanGenes <- function(object, marker.genes, unique=FALSE){
         # marker.genes =c("Cdh5,Pecam1,Flt1,Vwf,Plvap,Kdr") for example
         if(missing(object)) 
@@ -638,13 +630,23 @@ randomStrings <- function(n = 5000) {
         paste0(a, sprintf("%04d", sample(9999, n, TRUE)), sample(LETTERS, n, TRUE))
 }
 
-# rename ident for certain cells only
-# cells.use is vector of cell name
-RenameIdent.1 <- function (object, new.ident.name = NULL,cells.use = NULL) 
+
+#' rename ident for certain cells only
+#' One drawback, will not double check the duplicated cell names
+#' @param object Seurat object
+#' @param new.ident.name one character
+#' @param cells.use a vector of cell names
+#' @export object Seurat object with new ident
+#' @example 
+#' for(i in 1:length(SSC_labels_id)){
+#'         SSCs <- RenameIdent.1(SSCs, new.ident.name = names(SSC_labels_id)[i],
+#'                               cells.use = SSC_labels_id[[i]])
+#' }
+RenameIdent.1 <- function (object, new.ident.name, cells.use) 
 {
         new.levels <- old.levels <- levels(x = object@ident)
         if (!(new.ident.name %in% old.levels)) {
-                new.levels <- c(new.levels,new.ident.name)
+                new.levels <- c(new.levels, new.ident.name)
         }
         
         ident.vector <- as.character(x = object@ident)
@@ -654,6 +656,7 @@ RenameIdent.1 <- function (object, new.ident.name = NULL,cells.use = NULL)
         
         return(object)
 }
+
 
 # FeaturePlot doesn't return ggplot
 # SingleFeaturePlot doesn't take seurat object as input
@@ -804,35 +807,6 @@ SplitSeurat <- function(object = object, split.by = "conditions"){
 }
 
 
-SplitSingler <- function(singler = singler, split.by = "conditions"){
-        "
-        split singler object by certein criteria
-        
-        Inputs
-        -------------------
-        singler: singler object with seurat
-        split.by: the criteria to split
-        
-        Outputs
-        --------------------
-        Singler.subsets: list of subseted singler object by certein conditions,
-        plus levels of the conditions
-        "
-        if(is.null(singler$seurat))
-                stop("A seurat object must be provided first, add singler$seurat = your_seurat_object")
-        cell.subsets <- SplitCells(object = singler$seurat, split.by = split.by)
-        
-        Singler.subsets <- list()
-        for(i in 1:(length(cell.subsets)-1)){
-                cell.index <- which(singler$seurat@cell.names %in% cell.subsets[[i]])
-                Singler.subsets[[i]] <- SingleR.Subset.1(singler=singler,
-                                                         subsetdata =cell.index)
-        }
-        Singler.subsets[[i+1]] <- cell.subsets[[i+1]] # record conditions in the last return
-        return(Singler.subsets)
-}
-
-
 #' Split Seurat by certein criteria and make tsne plot
 #' @param object Seurat object
 #' @param split.by the criteria to split, can be gene name, or any variable in meta.data
@@ -863,53 +837,6 @@ SplitTSNEPlot <- function(object = mouse_eyes, split.by = "conditions",
         }
         p <- p[lapply(p,length)>0] # remove NULL element
         if(return.plots) return(p) else print(do.call(cowplot::plot_grid, p))
-}
-
-
-SplitSingleR.PlotTsne <- function(singler = singler, split.by = "conditions",
-                                  select.plots = NULL, return.plots = FALSE,
-                                  do.label= TRUE,do.letters = FALSE,main =FALSE,
-                                  show.2nd =FALSE,label.size = 4, dot.size = 3,
-                                  legend.size = NULL,... ){
-        "
-        split singler by certein criteria, and generate TSNE plot
-        
-        Inputs
-        -------------------
-        singler: singler object with seurat
-        split.by: the criteria to split
-        select.plots：change order to output, such as c(2,1)
-        return.data: TRUE/FASLE, return splited ojbect or not.
-        show.subtype: TRUE/FASLE, show sub cell type or not.
-        
-        Outputs
-        --------------------
-        return.plots: if return.data = TRUE
-        "
-        object.subsets <- SplitSingler(singler = singler, split.by = "conditions")
-        levels <- object.subsets[[length(object.subsets)]]
-        
-        out <- list()
-        p <- list()
-        if(is.null(select.plots)) select.plots <- 1:length(levels)
-        sp = select.plots
-        if(main) main_or_sub = "SingleR.single.main" else main_or_sub = "SingleR.single"
-        if(show.2nd) st =2 else st =1
-        for(i in 1:length(select.plots)){
-                out[[i]] <- SingleR.PlotTsne.1(SingleR= object.subsets[[sp[i]]]$singler[[st]][[main_or_sub]],
-                                               xy = object.subsets[[sp[i]]]$meta.data$xy,
-                                               do.label=do.label,do.letters = do.letters,
-                                               labels = object.subsets[[sp[i]]]$singler[[st]][[main_or_sub]]$labels,
-                                               label.size = label.size, dot.size = dot.size,...)
-                out[[i]] = out[[i]] +
-                        ggtitle(levels[sp[i]])+
-                        theme(text = element_text(size=20),							
-                              plot.title = element_text(hjust = 0.5))
-                if(!is.null(legend.size))
-                        out[[i]] = out[[i]] + theme(legend.text = element_text(size=legend.size))
-        }
-        out <- out[lapply(out,length)>0] # remove NULL element
-        if(return.plots) return(out) else print(do.call(plot_grid, out))
 }
 
 
@@ -1049,6 +976,73 @@ SplitDotPlotGG.1 <- function (object, grouping.var, genes.plot,
         if (do.return) {
                 return(p)
         }
+}
+
+
+# define topGOterms funtion ===
+#' topGoterm incorporate the whole topgo analysis pipeline
+#' @param int.genes genes of interest, extacted based DE analysis
+#' @param bg.genes background genes
+#' @param organism Select Human or mouse genes
+#' @param getBM biomaRt::getBM result. A table with gene name and go id.
+#' If no getBM is provided, function will find it automatically.
+#' @param ontology Specify ontology database, select within in c("BP","CC","MF"). Default is "BP".
+#' @param nodeSize an integer larger or equal to 1. Inherited from topGOdata ojbect
+#' @param topNodes an integer larger or equal to 1. Show many rows in final GenTable results.
+#' @export results GenTable result.
+#' @example 
+#' Spermatogonia.Go <-  topGOterms(int.genes = unique(Spermatogonia_markers),
+#                                  bg.genes = rownames(SSCs@data),
+#'                                 organism =  "Mouse",
+#'                                 getBM = getBM)
+topGOterms <- function(int.genes, bg.genes,organism =  "Mouse",getBM = NULL,
+                       ontology = "BP",
+                       nodeSize = 5,topNodes = 20){
+        
+        if(is.null(getBM)){
+                library(biomaRt)
+                Database = useMart("ensembl") %>% listDatasets() %>% as.data.frame()
+                # mmusculus_gene_ensembl is at 2nd
+                dataset = tail(Database[grep(organism,Database$description),"dataset"],1) 
+                print(paste("Use biomaRt",dataset,"dataset"))
+                # collect gene names from biomart
+                mart <- biomaRt::useMart("ensembl",dataset=dataset)
+                # Get ensembl gene ids and GO terms
+                getBM <- biomaRt::getBM(attributes = c("external_gene_name", "go_id"),
+                                        filters= "external_gene_name",
+                                        values = bg.genes,
+                                        mart = mart)
+        }
+        getBM <- getBM[getBM$go_id != '',]
+        geneID2GO <- by(getBM$go_id, getBM$external_gene_name, function(x) as.character(x))
+        all.genes <- sort(unique(as.character(getBM$external_gene_name)))
+        print(paste("Total",length(all.genes),"genes.",length(int.genes), "gene of interest"))
+        int.genes <- factor(as.integer(all.genes %in% int.genes))
+        names(int.genes) = all.genes
+        
+        tab = as.list(ontology)
+        names(tab) = ontology
+        for(ont in ontology){
+                go.obj <- new("topGOdata", ontology = ont,
+                              allGenes = int.genes,
+                              annot = annFUN.gene2GO,
+                              gene2GO = geneID2GO,
+                              nodeSize = nodeSize
+                )
+                resultFisher <- runTest(go.obj, algorithm = "elim", statistic = "fisher")
+                resultKS <- runTest(go.obj, algorithm = "classic", statistic = "ks")
+                resultKS.elim <- runTest(go.obj, algorithm = "elim", statistic = "ks")
+                
+                tab$ont <- GenTable(go.obj, classicFisher = resultFisher, 
+                                    classicKS = resultKS, elimKS = resultKS.elim,topNodes = topNodes,
+                                    orderBy = "elimKS", ranksOf = "classicFisher")
+        }
+        topGOResultsSxT <- as.data.frame(do.call(rbind,tab))
+        topGOResultsSxT <- topGOResultsSxT[(length(ontology)+1):nrow(topGOResultsSxT),]
+        rownames(topGOResultsSxT) = NULL
+        showSigOfNodes(go.obj, score(resultFisher), firstSigNodes = 5, useInfo = 'def')
+        
+        return(results.tab)
 }
 
 

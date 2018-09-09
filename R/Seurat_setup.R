@@ -164,17 +164,19 @@ SSCs <- RunPCA(object = SSCs, pc.genes = SSCs@var.genes, pcs.compute = 100,
 PCAPlot(object = SSCs)
 PCElbowPlot(object = SSCs, num.pc = 100)
 PCHeatmap(SSCs, pc.use = c(1:3, 25:30), cells.use = 500, do.balanced = TRUE)
+SSCs <- RunTSNE(object = SSCs, reduction.use = "pca", dims.use = 1:30, 
+                do.fast = TRUE, perplexity= 30)
 
 SSCs <- FindClusters(object = SSCs, reduction.type = "pca", dims.use = 1:30, resolution = 0.8, 
                      k.param = 30,force.recalc = T,
                      save.SNN = TRUE, n.start = 100, nn.eps = 0, print.output = FALSE)
-SSCs <- RunTSNE(object = SSCs, reduction.use = "pca", dims.use = 1:30, 
-                do.fast = TRUE, perplexity= 30)
 #SSCs@meta.data$orig.ident <- gsub("PND18pre","PND18",SSCs@meta.data$orig.ident)
-TSNEPlot.1(object = SSCs, do.label = F, group.by = "ident", 
-         do.return = TRUE, no.legend = T, colors.use = singler.colors,
-         pt.size = 1,label.size = 8 )+
-        ggtitle("TSNEPlot of all samples")+
+TSNEPlot.1(object = SSCs, do.label = T, group.by = "ident", 
+         do.return = TRUE, no.legend = T, 
+         text.repel = T, label.repel = F,
+        colors.use = singler.colors,
+         pt.size = 1,label.size = 6 )+
+        ggtitle("TSNEPlot, resolution = 0.8, k.param = 30")+
         theme(text = element_text(size=15),							
               plot.title = element_text(hjust = 0.5,size = 18, face = "bold")) 
 

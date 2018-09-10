@@ -6,6 +6,8 @@
 library(Seurat)
 library(SingleR)
 library(dplyr)
+library(tidyr)
+library(MAST)
 library(kableExtra)
 source("../R/Seurat_functions.R")
 source("../R/SingleR_functions.R")
@@ -43,37 +45,13 @@ Spermato@meta.data$orig.ident = gsub("Early Spermatocytes PND06|Early Spermatocy
                                      "Early Spermatocytes PND06-14",Spermato@meta.data$orig.ident)
 Spermato@meta.data$orig.ident = gsub("Early Spermatocytes PND25|Early Spermatocytes PND30",
                                      "Early Spermatocytes PND25-30",Spermato@meta.data$orig.ident)
-# merge time point ..2
-Spermato@meta.data$orig.ident = gsub("Spermatogonia PND18|Spermatogonia PND25|
-                                     |Spermatogonia PND30|Spermatogonia Ad-depleteSp|Spermatogonia Ad-Thy1",
-                                     "Spermatogonia PND18_and_later",Spermato@meta.data$orig.ident)
-Spermato@meta.data$orig.ident = gsub("Early Spermatocytes PND18|Early Spermatocytes PND25-30|
-                                     |Early Spermatocytes Adult",
-                                     "Early Spermatocytes PND18_and_later",Spermato@meta.data$orig.ident)
-Spermato@meta.data$orig.ident = gsub("Spermatocytes PND25|Spermatocytes PND30",
-                                     "Spermatocytes PND25-30",Spermato@meta.data$orig.ident)
-Spermato@meta.data$orig.ident = gsub("Spermatocytes Ad-depleteSp|Spermatocytes Ad-Thy1",
-                                     "Spermatocytes Adult",Spermato@meta.data$orig.ident)
-
-
 Spermato <- SetAllIdent(object = Spermato, id = 'orig.ident')
-table(Spermato@cell.names == Spermato1@cell.names)
-Spermato@scale.data = Spermato1@scale.data
+Spermato = ScaleData(Spermato)
 time_series <- c("PND06","PND14","PND18","PND25","PND30","Ad-depleteSp","Ad-Thy1")
-# all time point ...0
-time_points0 <- c(paste0("Spermatogonia ",time_series),
-                  paste0("Early Spermatocytes ",time_series),
-                  paste0("Spermatocytes ",time_series[-1]))
-
 # all time point ...1
 time_points1 <- c(paste0("Spermatogonia ",time_series),
                   paste0("Early Spermatocytes ", c("PND06-14","PND18","PND25-30","Adult")),
                   paste0("Spermatocytes ",time_series[-1]))
-# merge time point ..2
-time_points2 <- c("Spermatogonia PND06","Spermatogonia PND14","Spermatogonia PND18_and_later",
-                 "Early Spermatocytes PND06-14","Early Spermatocytes PND18_and_later",
-                 "Spermatocytes PND14","Spermatocytes PND18","Spermatocytes PND25-30",
-                 "Spermatocytes Adult")
 
 All_markers = read.csv("./output/20180826/All_markers.csv", header = T,stringsAsFactors =F)
 Spermato_markers <- All_markers[All_markers$major_cells %in% major_cells,] %>% 
@@ -88,8 +66,16 @@ DoHeatmap.1(Spermato,Spermato_markers,Top_n = 25,
 # ===Create txt Expression Data for GSEA====
 Spermato@ident = factor(Spermato@ident,levels = time_points1)
 table(Spermato@ident)
-exprs_Spermato = AverageExpression(Spermato,use.scale = T)
-
+#exprs_Spermato = AverageExpression(Spermato,use.scale = T)
+gde.all <- FindAllMarkers(object = Spermato,test.use = "MAST",
+                          logfc.threshold = 0.001,
+                          min.pct = 0, 
+                          min.cells.gene = 0,
+                          return.thresh = 1)
+write.table(gde.all,file= paste0(path,"/AllMarkers.txt"), sep="\t")
+gde_Spermato <- gde.all[,c("avg_logFC","cluster","gene")]
+exprs_Spermato <- spread(gde_Spermato,key = cluster, value = avg_logFC)
+exprs_Spermato[is.na(exprs_Spermato)] = 0
 # Convert Mounse Gene names to Human gene for GSEA analysis
 # https://www.r-bloggers.com/converting-mouse-to-human-gene-names-with-biomart-package/
 Mouse2Human <- function(x, unique = FALSE){
@@ -107,18 +93,16 @@ Mouse2Human <- function(x, unique = FALSE){
         print(head(genesV2))
         return(genesV2)
 }
-MouseGene <- data.frame("NAME"=rownames(exprs_Spermato),stringsAsFactors = FALSE)# didn't works for [,1]
+MouseGene <- data.frame("NAME"= exprs_Spermato$gene,stringsAsFactors = FALSE)# didn't works for [,1]
 GSEA <- Mouse2Human(MouseGene)
-colnames(GSEA) = c("MGI.symbol","NAME")
+colnames(GSEA) = c("gene","NAME")
 GSEA$DESCRIPTION = NA
-
-exprs_Spermato$MGI.symbol = rownames(exprs_Spermato)
-GSEA_exp <- merge(GSEA,exprs_Spermato,by = "MGI.symbol")
+GSEA_exp <- merge(GSEA,exprs_Spermato,by = "gene")
 GSEA_exp = GSEA_exp[,-1]
 
 path <- paste("./output",gsub("-","",Sys.Date()),sep = "/")
 dir.create(path, recursive = T)
-write.table(GSEA_exp, file= paste0(path,"/GSEA_exp.txt"), sep="\t", row.names = F)
+write.table(GSEA_exp, file= paste0(path,"/GSEA_exp_logFC.txt"), sep="\t", row.names = F)
 # Insert NAME at [1,1] using Edited
 # remove all " using Edited
 
@@ -144,8 +128,8 @@ write.table(GSEA_cls,file= paste0(path,"/GSEA_exp.cls"), sep=" ")
 
 
 
-GSEA_exp <- read.delim(paste0(path,"/GSEA_exp.txt"), row.names=1)
-gsea_Spermatogonia %>% kable() %>% kable_styling()
+gsea_report <- read.delim(paste0(path,"/gsea_report_for_Spermatogonia_repos_pos_1536549688186.txt"), row.names=1)
+gsea_report %>% kable() %>% kable_styling()
 
 
 

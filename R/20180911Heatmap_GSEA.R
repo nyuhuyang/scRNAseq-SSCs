@@ -20,6 +20,7 @@ SSCs@meta.data$orig.ident = gsub("PND18pre","PND18",SSCs@meta.data$orig.ident)
 table(SSCs@meta.data$orig.ident)
 table(SSCs@ident)
 major_cells <- c("Spermatogonia","Early Spermatocytes","Spermatocytes")
+#-------
 Spermato1 <- SubsetData(SSCs,ident.use = major_cells)
 TSNEPlot.1(object = Spermato1,do.label = T, group.by = "orig.ident",
            do.return = TRUE, no.legend = T, #colors.use = singler.colors[4:6],
@@ -27,7 +28,7 @@ TSNEPlot.1(object = Spermato1,do.label = T, group.by = "orig.ident",
         ggtitle("Spermatogonia and Spermatocytes at all time points")+
         theme(text = element_text(size=20),
               plot.title = element_text(hjust = 0.5, face = "bold"))
-
+remove(Spermato1);GC()
 # 4.1.1 heatmap ==============
 "check the timepoint of sub population in Spermatocytes"
 Spermato_list <- list()
@@ -37,6 +38,7 @@ for(i in 1:length(major_cells)){
                                                          Spermato_list[[i]]@meta.data$orig.ident)
 }
 Spermato <- Reduce(MergeSeurat,Spermato_list)
+remove(SSCs,Spermato_list);GC()
 table(Spermato@meta.data$orig.ident)
 # all time point ...1
 Spermato@meta.data$orig.ident = gsub("Early Spermatocytes Ad-.*$",
@@ -53,6 +55,7 @@ time_points1 <- c(paste0("Spermatogonia ",time_series),
                   paste0("Early Spermatocytes ", c("PND06-14","PND18","PND25-30","Adult")),
                   paste0("Spermatocytes ",time_series[-1]))
 
+#-------
 All_markers = read.csv("./output/20180826/All_markers.csv", header = T,stringsAsFactors =F)
 Spermato_markers <- All_markers[All_markers$major_cells %in% major_cells,] %>% 
         mutate(cluster = factor(major_cells))
@@ -66,16 +69,21 @@ DoHeatmap.1(Spermato,Spermato_markers,Top_n = 25,
 # ===Create txt Expression Data for GSEA====
 Spermato@ident = factor(Spermato@ident,levels = time_points1)
 table(Spermato@ident)
-#exprs_Spermato = AverageExpression(Spermato,use.scale = T)
+#---
+exprs_Spermato = AverageExpression(Spermato,use.scale = T)
+#---
 gde.all <- FindAllMarkers(object = Spermato,test.use = "MAST",
                           logfc.threshold = 0.001,
                           min.pct = 0, 
                           min.cells.gene = 0,
                           return.thresh = 1)
-write.table(gde.all,file= paste0(path,"/AllMarkers.txt"), sep="\t")
 gde_Spermato <- gde.all[,c("avg_logFC","cluster","gene")]
 exprs_Spermato <- spread(gde_Spermato,key = cluster, value = avg_logFC)
 exprs_Spermato[is.na(exprs_Spermato)] = 0
+#---
+exprs_Spermato = Spermato@scale.data
+exprs_Spermato = cbind.data.frame(rownames(exprs_Spermato),exprs_Spermato)
+colnames(exprs_Spermato)[1] = "gene"
 # Convert Mounse Gene names to Human gene for GSEA analysis
 # https://www.r-bloggers.com/converting-mouse-to-human-gene-names-with-biomart-package/
 Mouse2Human <- function(x, unique = FALSE){
@@ -99,12 +107,18 @@ colnames(GSEA) = c("gene","NAME")
 GSEA$DESCRIPTION = NA
 GSEA_exp <- merge(GSEA,exprs_Spermato,by = "gene")
 GSEA_exp = GSEA_exp[,-1]
-
 path <- paste("./output",gsub("-","",Sys.Date()),sep = "/")
 dir.create(path, recursive = T)
 write.table(GSEA_exp, file= paste0(path,"/GSEA_exp_logFC.txt"), sep="\t", row.names = F)
 # Insert NAME at [1,1] using Edited
 # remove all " using Edited
+Spermatogonia_logFC <- GSEA_exp[,1:9]
+write.table(Spermatogonia_logFC, file= paste0(path,"/Spermatogonia_logFC.txt"), sep="\t", row.names = F)
+EarlySpermatocytes_logFC <- GSEA_exp[,c(1:2,10:13)]
+write.table(EarlySpermatocytes_logFC, file= paste0(path,"/EarlySpermatocytes_logFC.txt"), sep="\t", row.names = F)
+Spermatocytes_logFC <- GSEA_exp[,c(1:2,14:19)]
+write.table(Spermatocytes_logFC, file= paste0(path,"/Spermatocytes_logFC.txt"), sep="\t", row.names = F)
+
 
 # ===Create time_series phentype labels for GSEA ===
 time.series <- c(6,14,18,25,30,35,40)
@@ -112,7 +126,7 @@ GSEA_cls <- list("#numeric",
                  paste0("#",major_cells[1]),
                  time.series,
                  paste0("#",major_cells[2]),
-                 c(14,18,25,35),
+                 c("6-14",18,25-30,35),
                  paste0("#",major_cells[3]),
                  time.series[-1])
 #GSEA.cls = lapply(GSEA.cls, function(x) sub(" ","_",x))
@@ -128,7 +142,7 @@ write.table(GSEA_cls,file= paste0(path,"/GSEA_exp.cls"), sep=" ")
 
 
 
-gsea_report <- read.delim(paste0(path,"/gsea_report_for_Spermatogonia_repos_pos_1536549688186.txt"), row.names=1)
+gsea_report <- read.delim(paste0(path,"/gsea_report_for_Spermatocytes_pos_1536630312315.txt"), row.names=1)
 gsea_report %>% kable() %>% kable_styling()
 
 

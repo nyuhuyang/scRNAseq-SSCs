@@ -25,7 +25,7 @@ SingleFeaturePlot.1(object = SSCs, "Laptm5")
 SingleFeaturePlot.1(object = SSCs, "Hbb-bt", threshold = 1.5)
 SingleFeaturePlot.1(object = SSCs, "Ptgds")
 SingleFeaturePlot.1(object = SSCs, "Wt1", threshold = 1.5)
-SingleFeaturePlot.1(object = SSCs, "Vim", threshold = 1.5)
+SingleFeaturePlot.1(object = SSCs, "Col1a2", threshold = 1.5)
 
 GermCell_markers <- MouseGenes(SSCs,c("Gfra1","Zbtb16","Sall4","Dmrt1","Dazl","Kit","Cdca8",
                                       "Id4","Sycp3","Mtl5","Nxt1","Shcbp1l","Aurka","Lyzl1",

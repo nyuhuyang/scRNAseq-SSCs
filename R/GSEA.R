@@ -12,7 +12,7 @@ library(kableExtra)
 source("../R/Seurat_functions.R")
 source("../R/SingleR_functions.R")
 
-# 4.1.1 load data ==============
+# 5.1 load data ==============
 lname1 = load(file = "./data/SSCs_20180825.Rda");lname1
 SSCs@meta.data$orig.ident = gsub("PND18pre","PND18",SSCs@meta.data$orig.ident)
 #SSCs@meta.data$orig.ident = gsub("Ad-.*$","Adult",SSCs@meta.data$orig.ident)
@@ -29,13 +29,13 @@ TSNEPlot.1(object = Spermato1,do.label = T, group.by = "orig.ident",
         theme(text = element_text(size=20),
               plot.title = element_text(hjust = 0.5, face = "bold"))
 remove(Spermato1);GC()
-# 4.1.1 heatmap ==============
+# 5.2 heatmap ==============
 "check the timepoint of sub population in Spermatocytes"
 Spermato_list <- list()
 for(i in 1:length(major_cells)){
         Spermato_list[[i]] <- SubsetData(SSCs,ident.use = major_cells[i])
         Spermato_list[[i]]@meta.data$orig.ident = paste(major_cells[i],
-                                                         Spermato_list[[i]]@meta.data$orig.ident)
+                                                        Spermato_list[[i]]@meta.data$orig.ident)
 }
 Spermato <- Reduce(MergeSeurat,Spermato_list)
 remove(SSCs,Spermato_list);GC()
@@ -65,8 +65,7 @@ DoHeatmap.1(Spermato,Spermato_markers,Top_n = 25,
             ident.use = "Spermatogonia and Spermatocytes",
             group.label.rot = T,cex.row = 7,remove.key =T,title.size = 12)
 
-
-# ===Create txt Expression Data for GSEA====
+# 5.3 Create txt Expression Data for GSEA====
 Spermato@ident = factor(Spermato@ident,levels = time_points1)
 table(Spermato@ident)
 #---
@@ -82,6 +81,9 @@ exprs_Spermato <- spread(gde_Spermato,key = cluster, value = avg_logFC)
 exprs_Spermato[is.na(exprs_Spermato)] = 0
 #---
 exprs_Spermato = Spermato@scale.data
+idents <- as.data.frame(table(Spermato@ident))
+time.rep <- as.integer(idents$Freq)
+exprs_Spermato = exprs_Spermato[,1:(time.rep[1]+time.rep[2])]
 exprs_Spermato = cbind.data.frame(rownames(exprs_Spermato),exprs_Spermato)
 colnames(exprs_Spermato)[1] = "gene"
 # Convert Mounse Gene names to Human gene for GSEA analysis
@@ -109,7 +111,7 @@ GSEA_exp <- merge(GSEA,exprs_Spermato,by = "gene")
 GSEA_exp = GSEA_exp[,-1]
 path <- paste("./output",gsub("-","",Sys.Date()),sep = "/")
 dir.create(path, recursive = T)
-write.table(GSEA_exp, file= paste0(path,"/GSEA_exp_logFC.txt"), sep="\t", row.names = F)
+write.table(GSEA_exp, file= paste0(path,"/GSEA_exp.txt"), sep="\t", row.names = F)
 # Insert NAME at [1,1] using Edited
 # remove all " using Edited
 Spermatogonia_logFC <- GSEA_exp[,1:9]
@@ -120,7 +122,7 @@ Spermatocytes_logFC <- GSEA_exp[,c(1:2,14:19)]
 write.table(Spermatocytes_logFC, file= paste0(path,"/Spermatocytes_logFC.txt"), sep="\t", row.names = F)
 
 
-# ===Create time_series phentype labels for GSEA ===
+# 5.4 Create time_series phentype labels for GSEA ===
 time.series <- c(6,14,18,25,30,35,40)
 GSEA_cls <- list("#numeric",
                  paste0("#",major_cells[1]),
@@ -139,11 +141,17 @@ write.table(GSEA_cls,file= paste0(path,"/GSEA_exp.cls"), sep=" ")
 # delete the first column;
 # delete all NA and "
 # delete the space before and after each row.
-
-
-
 gsea_report <- read.delim(paste0(path,"/gsea_report_for_Spermatocytes_pos_1536630312315.txt"), row.names=1)
 gsea_report %>% kable() %>% kable_styling()
 
-
-
+# ===Create regular phentype labels for GSEA ===
+sample_n <- ncol(exprs_Spermato)-1
+classes_n <- 2
+GSEA.cls <- list(c(sample_n,classes_n,1),
+                 c("#","Spermatogonia_PND06", "Spermatogonia_PND14"),
+                 c(rep(1,time.rep[1]),
+                   rep(2,time.rep[2])))
+GSEA.cls = lapply(GSEA.cls, function(x) sub(" ","",x))
+GSEA_cls <- t(list2df(GSEA.cls))
+GSEA_cls[is.na(GSEA_cls)] <- ""
+write.table(GSEA_cls,file= paste0(path,"/Spermatogonia_6_vs_14.cls"), sep=" ")

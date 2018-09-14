@@ -34,30 +34,6 @@ kable(All_markers[1:20,]) %>% kable_styling()
 rownames(All_markers) = NULL
 All_markers <- All_markers %>% select("gene", everything()) # Moving the last column to the start
 
-#' group_by + top_n + mutate + re-arrange data frame
-#' @param df  a data frame from FindAllMarkers
-#' @param ... Name-value pairs of expressions, same as ... in dplyr::mutate
-#' @param Top_n number of rows to return, same as n in dplyr::top_n. Default is NULL, return all rows.
-#' @export top a re-arranged data frame, sorted by avg_logFC, then arrange by ...
-#' @example 
-#' major_cells <- c("Spermatogonia","Early Spermatocytes","Spermatocytes","Spermatids")
-#' top <- group_top(df = All_markers, major_cells)
-group_top_mutate <- function(df, ..., Top_n = 500){
-        rownames(df) = NULL
-        df <- df %>% select("gene", everything()) # Moving the last column to the start
-        new.col = deparse(substitute(...))
-        new.order = assign(new.col,...)
-        if(class(df) != "data.frame") df = as.data.frame(df)
-        top <-  df %>% 
-                select("gene", everything()) %>%
-                group_by(cluster) %>% 
-                top_n(Top_n, wt = avg_logFC) %>%
-                mutate(new.col = factor(cluster, levels = new.order)) %>%
-                arrange(new.col)
-        colnames(top)[which(colnames(top) == "new.col")] = new.col
-        return(as.data.frame(top))
-}
-
 major_cells <- c("Spermatogonia","Early Spermatocytes","Spermatocytes",
                  "Round Spermatids","Spermatids","Sertoli cells",
                  "Endothelial & Hematopoietic cells", "Smooth muscle")

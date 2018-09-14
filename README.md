@@ -116,9 +116,9 @@ avg_logFC: log fold-change of the average expression between the two groups. Pos
 pct.1: The percentage of cells where the gene is detected in the first group.<br />
 pct.2: The percentage of cells where the gene is detected in the second group.<br />
 p_val_adj: Adjusted p-value, based on bonferroni<br />
-UMI.1 is average nUMI of the current cluster.
+UMI.1 is average nUMI of the current cluster.<br />
 UMI.2 is average nUMI of rest of clusters.<br />
-cluster : either cell types or original clusters in `SSCs_(date).Rda`.
+cluster : either cell type or corresponding cluster.
 
 ### 5. GSEA.R
 <a href="https://github.com/nyuhuyang/scRNAseq-SSCs/blob/master/R/GSEA.R">GSEA.R</a></li>

@@ -96,17 +96,15 @@ df2list <- function(df){
 #' DoHeatmap.1, automatically group_top by cluster, order by Time_points
 DoHeatmap.1 <- function(object, marker_df,Top_n = 10, group.order = NULL,ident.use,
                         group.label.rot =T,cex.row = 8,remove.key =T,use.scaled = T,
-                        group.cex = 13,title.size = 14){
+                        group.cex = 13,title.size = 14,...){
         top <-  marker_df %>% group_by(cluster) %>% top_n(Top_n, avg_logFC)
         DoHeatmap(object = object, genes.use = top$gene,
                   group.order = group.order, use.scaled = use.scaled,
                   slim.col.label = TRUE, remove.key = remove.key,cex.row = cex.row,
-                  group.cex = group.cex, rotate.key = T,group.label.rot = group.label.rot)+
-                ggtitle(paste("Expression heatmap of top",Top_n,
-                              "differential expression genes in each time points for",
-                              ident.use))+
-                theme(text = element_text(size=20),
-                      plot.title = element_text(hjust = 0.5,size=title.size))
+                  group.cex = group.cex, rotate.key = T,group.label.rot = group.label.rot,
+                  title = paste("Expression heatmap of top",Top_n,
+                                "differential expression genes in each time points for",
+                                ident.use),...)
 }
 
 
@@ -548,6 +546,32 @@ gg_color_hue <- function(n) {
         grDevices::hcl(h = hues, l = 65, c = 100)[1:n]
 }
 #gg_color_hue(4)
+
+
+#' group_by + top_n + mutate + re-arrange data frame
+#' @param df  a data frame from FindAllMarkers
+#' @param ... Name-value pairs of expressions, same as ... in dplyr::mutate
+#' @param Top_n number of rows to return, same as n in dplyr::top_n. Default is NULL, return all rows.
+#' @export top a re-arranged data frame, sorted by avg_logFC, then arrange by ...
+#' @example 
+#' major_cells <- c("Spermatogonia","Early Spermatocytes","Spermatocytes","Spermatids")
+#' top <- group_top(df = All_markers, major_cells)
+group_top_mutate <- function(df, ..., Top_n = 500){
+        rownames(df) = NULL
+        df <- df %>% dplyr::select("gene", everything()) # Moving the last column to the start
+        new.col = deparse(substitute(...))
+        new.order = assign(new.col,...)
+        if(class(df) != "data.frame") df = as.data.frame(df)
+        top <-  df %>% 
+                dplyr::select("gene", everything()) %>%
+                group_by(cluster) %>% 
+                top_n(Top_n, wt = avg_logFC) %>%
+                mutate(new.col = factor(cluster, levels = new.order)) %>%
+                arrange(new.col)
+        colnames(top)[which(colnames(top) == "new.col")] = new.col
+        return(as.data.frame(top))
+}
+
 
 # modified GenePlot
 # GenePlot.1(do.hover = TRUE) will return ggplot 

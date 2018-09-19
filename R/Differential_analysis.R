@@ -10,10 +10,10 @@ library(kableExtra)
 library(SingleR)
 library(reshape2)
 library(MAST)
-library(topGO)
-source("../R/Seurat_functions.R")
-source("../R/SingleR_functions.R")
+source("./R/Seurat_functions.R")
 
+path <- paste("./output",gsub("-","",Sys.Date()),sep = "/")
+dir.create(path, recursive = T)
 # 4.1 load data & Rename ident, Compare DE across all major cell types=========================
 # 4.1.1 load data ==============
 lname1 = load(file = "./data/SSCs_20180825.Rda");lname1
@@ -66,6 +66,35 @@ Spermatogonia.Go <-  topGOterms(int.genes = unique(Spermatogonia_markers),
 Spermatogonia.Go %>% kable() %>% kable_styling()
 #====== 4.2 SubsetData, Compare DE across all major cell types==================
 
+# 4.2.1 SSCs-spermato ==============
+SSCs_spermato <- SubsetData(SSCs,ident.use = major_cells[1:5])
+# 4.2.1.1 remove spermatid contaminated transcripts =======
+Spermatid_Genes_to_Filter <- readxl::read_excel("./doc/Spermatid Genes to Filter.xlsx")
+Spermatid_Genes = Spermatid_Genes_to_Filter$`Completely Spermatid Gene List To Remove (Spermatid/Other UMI Ratio > 20; and GSEA and tSNEs)`
+genes.use = rownames(SSCs_spermato@data); length(genes.use)
+table(Spermatid_Genes %in% genes.use)
+genes.use = genes.use[!(genes.use %in% Spermatid_Genes)]; length(genes.use)
+SSCs_spermato@raw.data = SSCs_spermato@raw.data[genes.use, ]
+SSCs_spermato@data = SSCs_spermato@data[genes.use, ]
+#SSCs_spermato@scale.data = SSCs_spermato@scale.data[genes.use, ]
+TSNEPlot.1(object = SSCs_spermato,do.label = T, group.by = "ident",
+           do.return = TRUE, no.legend = T,colors.use = singler.colors[4:8],
+           pt.size = 1,label.size = 5,label.repel = T)+
+        ggtitle("Five germ cell types")+
+        theme(text = element_text(size=20),
+              plot.title = element_text(hjust = 0.5, face = "bold"))
+
+SSCs_spermato_markers <- top[(top$cluster %in% major_cells[1:5]),]
+DoHeatmap.1(SSCs_spermato,SSCs_spermato_markers,Top_n = 20, 
+            group.order = major_cells[1:5],ident.use = "all germ cells",
+            group.label.rot = T,cex.row = 6,remove.key =T)
+
+SSCs_spermato_markers <- FindAllMarkers.UMI(SSCs_spermato,test.use = "MAST")
+kable(SSCs_spermato_markers[1:20,]) %>% kable_styling()
+rownames(SSCs_spermato_markers) = NULL
+SSCs_spermato_markers <- SSCs_spermato_markers %>% select("gene", everything()) # Moving the last column to the start
+write.csv(SSCs_spermato_markers,"./output/20180918/SSCs_spermato_markers.csv")
+
 # 4.2.0. define pipeline ==============
 
 #' pipeline renameIdent + FindAllMarkers + group_top + write.csv
@@ -90,8 +119,8 @@ RenameIdent_FindAllMarkers <- function(object,ident.use, ...,
         # merge ident
         if(!is.null(replace.from)) {
                 object@meta.data$orig.ident = sub(replace.from,
-                                                      replace.to,
-                                                      object@meta.data$orig.ident)
+                                                  replace.to,
+                                                  object@meta.data$orig.ident)
         }
         # Top_n = NULL, save all genes
         if(is.null(Top_n)) Top_n = nrow(object@data)
@@ -102,12 +131,12 @@ RenameIdent_FindAllMarkers <- function(object,ident.use, ...,
         names(x = ident.vector) <- names(object@ident)
         object@ident = ident.vector
         object@ident <- factor(x = object@ident,
-                                   levels = new.order) 
+                               levels = new.order) 
         print(table(object@ident))
         
         g <- TSNEPlot(object = object,do.label = F, group.by = "ident", 
-                 do.return = TRUE, no.legend = F, 
-                 pt.size = 1,label.size = 8 )+
+                      do.return = TRUE, no.legend = F, 
+                      pt.size = 1,label.size = 8 )+
                 ggtitle(ident.use)+
                 theme(text = element_text(size=20),     							
                       plot.title = element_text(hjust = 0.5,size = 25, face = "bold")) 
@@ -124,18 +153,6 @@ RenameIdent_FindAllMarkers <- function(object,ident.use, ...,
         return(list(object, object_develop, g))
 }
 
-# 4.2.1 SSCs-spermato ==============
-SSCs_spermato <- SubsetData(SSCs,ident.use = major_cells[1:5])
-SSCs_spermato_markers <- top[(top$cluster %in% major_cells[1:5]),]
-DoHeatmap.1(SSCs_spermato,SSCs_spermato_markers,Top_n = 20, 
-            group.order = major_cells[1:5],ident.use = "all germ cells",
-            group.label.rot = T,cex.row = 6,remove.key =T)
-#-----
-SSCs_spermato <- SubsetData(SSCs,ident.use = major_cells[1:3])
-SSCs_spermato_markers <- top[(top$cluster %in% major_cells[1:3]),]
-DoHeatmap.1(SSCs_spermato,SSCs_spermato_markers,Top_n = 25,
-            group.order = major_cells[1:3],ident.use = "Spermatogonia and Spermatocytes",
-            group.label.rot = T,cex.row = 8,remove.key =T, title.size = 12)
 # 4.2.2 Spermatogonia ==============
 Spermatogonia <- SubsetData(SSCs,ident.use = "Spermatogonia")
 table(Spermatogonia@meta.data$orig.ident)

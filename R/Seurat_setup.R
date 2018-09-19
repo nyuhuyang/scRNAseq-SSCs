@@ -180,4 +180,4 @@ TSNEPlot.1(object = SSCs, do.label = T, group.by = "ident",
         theme(text = element_text(size=15),							
               plot.title = element_text(hjust = 0.5,size = 18, face = "bold")) 
 
-save(SSCs, file = "./data/SSCs_20180825.Rda")
+save(SSCs, file = "./data/SSCs_20180822.Rda")

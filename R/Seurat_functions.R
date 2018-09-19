@@ -94,17 +94,20 @@ df2list <- function(df){
 
 
 #' DoHeatmap.1, automatically group_top by cluster, order by Time_points
-DoHeatmap.1 <- function(object, marker_df,Top_n = 10, group.order = NULL,ident.use,
+DoHeatmap.1 <- function(object, marker_df, add.genes = NULL, Top_n = 10, group.order = NULL,ident.use,
                         group.label.rot =T,cex.row = 8,remove.key =T,use.scaled = T,
                         group.cex = 13,title.size = 14,...){
         top <-  marker_df %>% group_by(cluster) %>% top_n(Top_n, avg_logFC)
-        DoHeatmap(object = object, genes.use = top$gene,
+        if(!is.null(add.genes)) {
+                top_gene = c(add.genes, "Odf2",top$gene)
+        } else top_gene = top$gene
+        return(DoHeatmap(object = object, genes.use = top_gene,
                   group.order = group.order, use.scaled = use.scaled,
                   slim.col.label = TRUE, remove.key = remove.key,cex.row = cex.row,
                   group.cex = group.cex, rotate.key = T,group.label.rot = group.label.rot,
                   title = paste("Expression heatmap of top",Top_n,
-                                "differential expression genes in each time points for",
-                                ident.use),...)
+                                "differential expression genes in",
+                                ident.use),...))
 }
 
 

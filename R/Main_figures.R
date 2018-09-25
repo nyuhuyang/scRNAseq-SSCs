@@ -15,18 +15,17 @@ dir.create(path, recursive = T)
 #################################################################
 
 lname1 = load(file = "./data/SSCs_20180825.Rda");lname1
-SSCs@meta.data$orig.ident = gsub("PND18pre","PND18",SSCs@meta.data$orig.ident)
+#SSCs@meta.data$orig.ident = gsub("PND18pre","PND18",SSCs@meta.data$orig.ident)
 table(SSCs@meta.data$orig.ident)
 table(SSCs@ident)
 major_cells <- c("Spermatogonia","Early Spermatocytes","Spermatocytes",
                  "Round Spermatids","Spermatids","Sertoli cells",
                  "Endothelial & Hematopoietic cells", "Smooth muscle")
 SSCs_spermato <- SubsetData(SSCs,ident.use = major_cells[1:5])
-SSCs_spermato@meta.data$orig.ident = sub("PND18pre","PND18",SSCs_spermato@meta.data$orig.ident)
 counts <- table(as.vector(SSCs_spermato@ident), SSCs_spermato@meta.data$orig.ident)
 kable(counts) %>% kable_styling()
 major_cells = major_cells[1:5]
-time_series <- c("PND06","PND14","PND18","PND25","PND30","Ad-depleteSp","Ad-Thy1")
+time_series <- c("PND06","PND14","PND18","PND18pre","PND25","PND30","Ad-depleteSp","Ad-Thy1")
 counts = counts[rev(major_cells),time_series]
 
 jpeg(paste0(path,"/1_B_bar_chart.jpeg"), units="in", width=10, height=7,
@@ -109,8 +108,10 @@ marker = MouseGenes(SSCs_spermato,c("Gfra1", "Zbtb16", "Nanos2", "Utf1", "Sall4"
                                     "Id4", "Sohlh1", "Kit", "Lin28a", "Pax7", "Dmrt1"))
 g1 <- DoHeatmap.1(SSCs_spermato,SSCs_spermato_markers, 
                   Top_n = 15, 
+                  #col.low = "#0000FF",col.mid = "#FFFFFF",col.high = "#FF0000",
                   group.order = major_cells, 
                   ident.use = "five types of germ cells",
+                  draw.line = TRUE,
                   group.label.rot = T,cex.row = 6,remove.key =T,title.size = 12)
 
 # 5.2.2. make color bar ========
@@ -247,4 +248,188 @@ dev.off()
 # add g_Spermatids color bar
 jpeg(paste0(path,"/3_heatmap_5.jpeg"), units="in", width=10, height=7,res=600)
 g_Spermatids
+dev.off()
+
+#################################################################
+#
+# Figure 4 Marker gene, development gene, and discovered GOI heatmap for spermatogonia
+#
+#################################################################
+# 6.4.1 load data =======
+lname1 = load(file = "./data/SSCs_20180825.Rda"); lname1
+table(SSCs@ident)
+table(SSCs@meta.data$orig.ident)
+Spermatogonia <- SubsetData(SSCs,ident.use = "Spermatogonia")
+
+# 6.4.2 remove spermatid contaminated transcripts =======
+Spermatid_Genes_to_Filter <- readxl::read_excel("./doc/Spermatid Genes to Filter.xlsx")
+Spermatid_Genes = Spermatid_Genes_to_Filter$`Completely Spermatid Gene List To Remove (Spermatid/Other UMI Ratio > 20; and GSEA and tSNEs)`
+genes.use = rownames(Spermatogonia@data); length(genes.use)
+table(Spermatid_Genes %in% genes.use)
+genes.use = genes.use[!(genes.use %in% Spermatid_Genes)]; length(genes.use)
+Spermatogonia@raw.data = Spermatogonia@raw.data[genes.use, ]
+Spermatogonia@data = Spermatogonia@data[genes.use, ]
+
+# 6.4.3 merge ident and find development genes =======
+table(Spermatogonia@meta.data$orig.ident)
+Spermatogonia@meta.data$orig.ident = gsub("PND18|PND25|PND30",
+                                     "PND18-30",Spermatogonia@meta.data$orig.ident)
+Spermatogonia@meta.data$orig.ident = gsub("Ad-depleteSp|Ad-Thy1",
+                                     "Adault",Spermatogonia@meta.data$orig.ident)
+Spermatogonia <- SetAllIdent(object = Spermatogonia, id = 'orig.ident')
+Spermatogonia <- SubsetData(Spermatogonia,ident.remove = "PND18-30pre")
+table(Spermatogonia@ident)
+time_series <- c("PND06","PND14","PND18-30","Adault")
+Spermatogonia@ident = factor(Spermatogonia@ident,levels = time_series)
+Spermatogonia_dev <- FindAllMarkers.UMI(Spermatogonia)
+table(Spermatogonia_dev$cluster)
+write.csv2(Spermatogonia_dev, file = paste0(path,"/Spermatogonia_dev_merge.csv"))
+
+# 6.4.4 generate heatmap =======
+SSCs_spermato_markers = read.csv("./output/20180918/SSCs_spermato_markers.csv",
+                                 header = T,stringsAsFactors =F)
+table(SSCs_spermato_markers$cluster)
+Spermatogonia_marker = SSCs_spermato_markers[(SSCs_spermato_markers$cluster 
+                                              %in% "Spermatogonia"),"gene"]
+Spermatogonia_dev1 = Spermatogonia_dev[(Spermatogonia_dev$pct.1>0.2),]
+marker = MouseGenes(Spermatogonia,c(Spermatogonia_marker[1:5],"Gfra1", "Zbtb16", "Nanos2", "Utf1", "Sall4",
+                                    "Id4", "Sohlh1", "Kit", "Lin28a","Dmrt1"))
+g1 <- DoHeatmap.1(Spermatogonia,Spermatogonia_dev1, 
+                  Top_n = 200, add.genes = marker,
+                  #col.low = "#0000FF",col.mid = "#FFFFFF",col.high = "#FF0000",
+                  group.order = time_series, 
+                  ident.use = "Spermatogonia development genes",
+                  draw.line = TRUE,
+                  group.label.rot = T,cex.row = 0,remove.key =T,title.size = 12)
+jpeg(paste0(path,"/4_Spermatogonia_dev_200.jpeg"), units="in", width=10, height=7,res=600)
+g1
+dev.off()
+#################################################################
+#
+# Figure 5 Marker gene, development gene, and discovered GOI heatmap for spermatocytes
+#
+#################################################################
+# 6.5.1 load data =======
+lname1 = load(file = "./data/SSCs_20180825.Rda"); lname1
+table(SSCs@ident)
+table(SSCs@meta.data$orig.ident)
+Spermatocytes <- SubsetData(SSCs,ident.use = "Spermatocytes")
+
+# 6.5.2 remove spermatid contaminated transcripts =======
+Spermatid_Genes_to_Filter <- readxl::read_excel("./doc/Spermatid Genes to Filter.xlsx")
+Spermatid_Genes = Spermatid_Genes_to_Filter$`Completely Spermatid Gene List To Remove (Spermatid/Other UMI Ratio > 20; and GSEA and tSNEs)`
+genes.use = rownames(Spermatocytes@data); length(genes.use)
+table(Spermatid_Genes %in% genes.use)
+genes.use = genes.use[!(genes.use %in% Spermatid_Genes)]; length(genes.use)
+Spermatocytes@raw.data = Spermatocytes@raw.data[genes.use, ]
+Spermatocytes@data = Spermatocytes@data[genes.use, ]
+
+# 6.5.3 merge ident and find development genes =======
+table(Spermatocytes@meta.data$orig.ident)
+Spermatocytes <- SetAllIdent(object = Spermatocytes, id = 'orig.ident')
+Spermatocytes <- SubsetData(Spermatocytes,ident.remove = "PND18pre")
+table(Spermatocytes@ident)
+time_series <- c("PND14","PND18","PND25","PND30","Ad-depleteSp","Ad-Thy1")
+Spermatocytes@ident = factor(Spermatocytes@ident,levels = time_series)
+Spermatocytes_dev <- FindAllMarkers.UMI(Spermatocytes)
+table(Spermatocytes_dev$cluster)
+write.csv2(Spermatocytes_dev, file = paste0(path,"/Spermatocytes_dev.csv"))
+
+# 6.5.4 generate heatmap =======
+SSCs_spermato_markers = read.csv("./output/20180918/SSCs_spermato_markers.csv",
+                                 header = T,stringsAsFactors =F)
+table(SSCs_spermato_markers$cluster)
+Spermatocytes_marker = SSCs_spermato_markers[(SSCs_spermato_markers$cluster 
+                                              %in% "Spermatocytes"),"gene"]
+Spermatocytes_dev1 = Spermatocytes_dev[(Spermatocytes_dev$pct.1>0),]
+marker = MouseGenes(Spermatocytes,c(Spermatocytes_marker[1:15]))
+g1 <- DoHeatmap.1(Spermatocytes,Spermatocytes_dev1, 
+                  Top_n = 200, add.genes = marker,
+                  #col.low = "#0000FF",col.mid = "#FFFFFF",col.high = "#FF0000",
+                  group.order = time_series, 
+                  ident.use = "Spermatocytes development genes",
+                  draw.line = TRUE,
+                  group.label.rot = T,cex.row = 0,remove.key =T,title.size = 12)
+jpeg(paste0(path,"/5_Spermatocytes_dev_200.jpeg"), units="in", width=10, height=7,res=600)
+g1
+dev.off()
+
+#################################################################
+#
+# Figure S1 – Data Quality Graphs
+#
+#################################################################
+SSCs_raw <- list()
+SSCs_Seurat <- list()
+samples <- c("PND06","PND14","PND18",#"PND18pre",
+             "PND25","PND30","Ad-depleteSp","Ad-Thy1")
+conditions <- c("first-wave","first-wave","first-wave",#"first-wave",
+                "first-wave","first-wave","Adault-SSCs","Adault-SSCs")
+for(i in 1:length(samples)){
+        SSCs_raw[[i]] <- Read10X(data.dir = paste0("./data/",
+                                                   samples[i],"/outs/filtered_gene_bc_matrices/mm10/"))
+        colnames(SSCs_raw[[i]]) <- paste0(samples[i],"_",colnames(SSCs_raw[[i]]))
+        SSCs_Seurat[[i]] <- CreateSeuratObject(SSCs_raw[[i]],
+                                               min.cells = 3,
+                                               min.genes = 200,
+                                               names.delim = "_",
+                                               project = "paula")
+        SSCs_Seurat[[i]]@meta.data$conditions <- conditions[i]
+}
+SSCs <- Reduce(function(x, y) MergeSeurat(x, y, do.normalize = F), SSCs_Seurat)
+remove(SSCs_raw,SSCs_Seurat);GC()
+SSCs <- FilterCells(SSCs, subset.names = "nGene",
+                    low.thresholds = 200,
+                    high.thresholds = Inf) %>%
+        NormalizeData() %>%
+        ScaleData(display.progress = FALSE) %>%
+        FindVariableGenes(do.plot = FALSE, display.progress = FALSE)
+mito.genes <- grep(pattern = "^mt-", x = rownames(x = SSCs@data), value = TRUE)
+percent.mito <- Matrix::colSums(SSCs@raw.data[mito.genes, ])/Matrix::colSums(SSCs@raw.data)
+SSCs <- AddMetaData(object = SSCs, metadata = percent.mito, col.name = "percent.mito")
+
+g1 <- VlnPlot(object = SSCs, features.plot = c("nGene", "nUMI", "percent.mito"), nCol = 1,
+              x.lab.rot = T, do.return = T,return.plotlist = T)
+SSCs <- FilterCells(object = SSCs, subset.names = c("nGene","nUMI","percent.mito"),
+                    low.thresholds = c(500,2000, -Inf), 
+                    high.thresholds = c(8000,125000, 0.15))
+
+g2 <- VlnPlot(object = SSCs, features.plot = c("nGene", "nUMI", "percent.mito"), nCol = 1,
+              x.lab.rot = T, do.return = T,return.plotlist = T)
+
+lname1 = load(file = "./data/SSCs_20180825.Rda");lname1
+table(SSCs@ident)
+SSCs <- SetAllIdent(object = SSCs, id = 'orig.ident')
+SSCs <- SubsetData(SSCs,ident.remove = "PND18pre")
+table(SSCs@ident)
+g3 <- VlnPlot(object = SSCs, features.plot = c("nGene", "nUMI", "percent.mito"), nCol = 1,
+              x.lab.rot = T, do.return = T, use.scaled = TRUE, group.by = "orig.ident",
+              return.plotlist = T)
+library(gridExtra)
+library(grid)
+jpeg(paste0(path,"/S1_QC_nGene.jpeg"), units="in", width=10, height=7,res=600)
+grid.arrange(g1[[1]],
+             g2[[1]]+ylim(0,10000),
+             g3[[1]]+ylim(0,10000),
+        nrow = 1,
+        top = "nGene per library before filtering, after filtering, after batch correction"
+)
+dev.off()
+
+jpeg(paste0(path,"/S1_QC_nUMI.jpeg"), units="in", width=10, height=7,res=600)
+grid.arrange(g1[[2]]+ylim(0,300000),
+             g2[[2]]+ylim(0,300000),
+             g3[[2]]+ylim(0,300000),
+             nrow = 1,
+             top = "nUMI per library before filtering, after filtering, after batch correction"
+)
+dev.off()
+
+jpeg(paste0(path,"/S1_QC_percent.mito_1.jpeg"), units="in", width=10, height=7,res=600)
+grid.arrange(g1[[3]]+ylim(0,1),
+             g2[[3]]+ylim(0,1),
+             #g3[[3]]+ylim(0,1),
+             nrow = 1,
+             top = "percent.mito per library before filtering, after filtering"
+)
 dev.off()

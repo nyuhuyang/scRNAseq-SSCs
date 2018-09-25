@@ -22,7 +22,7 @@ major_cells <- c("Spermatogonia","Early Spermatocytes","Spermatocytes")
 #------- heatmap optional -----
 Spermato1 <- SubsetData(SSCs,ident.use = major_cells)
 TSNEPlot.1(object = Spermato1,do.label = T, group.by = "orig.ident",
-           do.return = TRUE, no.legend = T, #colors.use = singler.colors[4:6],
+           do.return = TRUE, no.legend = T, #colors.use = singler.colorss[4:6],
            pt.size = 1,label.size = 5,label.repel = T)+
         ggtitle("Spermatogonia and Spermatocytes at all time points")+
         theme(text = element_text(size=20),
@@ -31,12 +31,12 @@ remove(Spermato1);GC()
 # 5.2 filter, scale, merge time points ==============
 "check the timepoint of sub population in Spermatocytes"
 # 5.2.1 remove spermatid contaminated transcripts =======
-Spermatid_Genes_to_Filter <- readxl::read_excel("./doc/Spermatid Genes to Filter.xlsx")
-Spermatid_Genes = Spermatid_Genes_to_Filter$`Completely Spermatid Gene List To Remove (Spermatid/Other UMI Ratio > 20; and GSEA and tSNEs)`
-genes.use = rownames(SSCs@data); length(genes.use)
-table(Spermatid_Genes %in% genes.use)
-genes.use = genes.use[!(genes.use %in% Spermatid_Genes)]; length(genes.use)
-SSCs@raw.data = SSCs@raw.data[genes.use, ]
+#Spermatid_Genes_to_Filter <- readxl::read_excel("./doc/Spermatid Genes to Filter.xlsx")
+#Spermatid_Genes = Spermatid_Genes_to_Filter$`Completely Spermatid Gene List To Remove (Spermatid/Other UMI Ratio > 20; and GSEA and tSNEs)`
+#genes.use = rownames(SSCs@data); length(genes.use)
+#table(Spermatid_Genes %in% genes.use)
+#genes.use = genes.use[!(genes.use %in% Spermatid_Genes)]; length(genes.use)
+#SSCs@raw.data = SSCs@raw.data[genes.use, ]
 
 # 5.2.2 SubsetData, merge, batch correction again ===
 Spermato_list <- list()
@@ -161,5 +161,5 @@ write.table(GSEA_cls,file= paste0(path,"/GSEA_exp.cls"), sep=" ")
 # delete the first column;
 # delete all NA and "
 # delete the space before and after each row.
-gsea_report <- read.delim(paste0(path,"/gsea_report_for_Spermatogonia_repos_neg_1536890653484.txt"), row.names=1)
+gsea_report <- read.delim("~/Downloads/gsea_report_for_Spermatocytes_neg_1537120967457.txt", row.names=1)
 gsea_report %>% kable() %>% kable_styling()

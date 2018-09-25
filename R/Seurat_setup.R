@@ -9,7 +9,7 @@ library(dplyr)
 library(Matrix)
 library(sva)
 library(SingleR)
-source("../R/Seurat_functions.R")
+source("./R/Seurat_functions.R")
 ########################################################################
 #
 #  1 Data preprocessing
@@ -80,6 +80,9 @@ g1
 SSCs <- FilterCells(object = SSCs, subset.names = c("nGene","nUMI","percent.mito"),
                     low.thresholds = c(500,2000, -Inf), 
                     high.thresholds = c(8000,125000, 0.15))
+
+g2 <- VlnPlot(object = SSCs, features.plot = c("nGene", "nUMI", "percent.mito"), nCol = 1,
+              x.lab.rot = T, do.return = T)
 
 par(mfrow = c(2, 1))
 GenePlot(object = SSCs, gene1 = "nUMI", gene2 = "percent.mito",use.raw = T)

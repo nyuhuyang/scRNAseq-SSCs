@@ -30,7 +30,7 @@ SingleFeaturePlot.1(object = SSCs, "Col1a2", threshold = 1.5)
 GermCell_markers <- MouseGenes(SSCs,c("Gfra1","Zbtb16","Sall4","Dmrt1","Dazl","Kit","Cdca8",
                                       "Id4","Sycp3","Mtl5","Nxt1","Shcbp1l","Aurka","Lyzl1",
                                       "Acrv1","Hemgn","Txndc8","Tssk6","Oaz3","Prm2"))
-SingleFeaturePlot.1(object = SSCs, "Gfra1", threshold = 0.8)
+SingleFeaturePlot.1(object = SSCs, "Gfra1", threshold = 0.1)
 SingleFeaturePlot.1(object = SSCs, "Zbtb16", threshold = 1.5)
 SingleFeaturePlot.1(object = SSCs, "Sall4", threshold = 1)
 SingleFeaturePlot.1(object = SSCs, "Dmrt1", threshold = 0.1)
@@ -53,14 +53,13 @@ SingleFeaturePlot.1(object = SSCs, "Prm2", threshold = 3.5)
 
 #====== 3.3 DotPlot =========================
 marker_order <- c(8,6,3,9,0,15,2,7,18,17,10,11,5,4,12,20,21,14,16,13,1,19)
-SSCs@ident <- factor(x = SSCs@ident, levels = rev(marker_order)) # Relevel object@ident
-markers.to.plot <- c(GermCell_markers,Somatic_markers)
+SSCs@ident <- factor(x = SSCs@ident, levels = rev(marker_order))
 DotPlot(SSCs, genes.plot = rev(markers.to.plot),
         cols.use = c("blue","red"), x.lab.rot = T, plot.legend = T,
         dot.scale = 8, do.return = T)
 
 #====== 3.4 Rename ident =========================
-lname1 = load(file = "./data/SSCs_20180825.Rda");lname1
+lname1 = load(file = "./data/SSCs_20180822.Rda");lname1
 table(SSCs@ident)
 idents <- as.data.frame(table(SSCs@ident))
 old.ident.ids <- idents$Var1
@@ -101,7 +100,8 @@ TSNEPlot.1(object = SSCs,do.label = T, group.by = "ident",
         ggtitle("Unsupervised clustering and discovery of cell types by marker genes")+
         theme(text = element_text(size=20),							
               plot.title = element_text(hjust = 0.5,size=18, face = "bold"))
-
+SSCs <- StashIdent(object = SSCs, save.name = "Cell.Types")
+save(SSCs, file = "./data/SSCs_20180926.Rda")
 #====== 3.5 hand pick cells ident and Rename ident again =========================
 
 # 3.5.1 hand pick cells ident===
@@ -198,8 +198,15 @@ SSC_labels_id <- factor2list(cell.names = names(SSCs@ident),
 # back to hand pick if need more
 saveRDS(SSC_labels_id, file = "./output/SSC_labels_20180825.Rda")
 save(SSCs, file = "./data/SSCs_20180825.Rda")
-
 SSC_labels_id = readRDS(file = "./output/SSC_labels_20180825.Rda")
+
+# 20180925
+ident.use <- data.frame("ident.use" = as.vector(SSCs@ident),
+                        row.names = names(SSCs@ident))
+SSCs <- AddMetaData(SSCs, ident.use,"ident.use")
+gene.use <- rownames(SSCs@scale.data);length(gene.use)
+SSCs@data = SSCs@data[gene.use,]
+save(SSCs, file = "./data/SSCs_20180925.Rda")
 
 #====== 3.6 SubsetData SSCs_Spermato =========================
 # total cell number

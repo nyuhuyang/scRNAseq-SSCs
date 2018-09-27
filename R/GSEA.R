@@ -10,8 +10,8 @@ library(tidyr)
 library(MAST)
 library(sva)
 library(kableExtra)
-source("../R/Seurat_functions.R")
-source("../R/SingleR_functions.R")
+source("./R/Seurat_functions.R")
+source("./R/SingleR_functions.R")
 
 # 5.1 load data ==============
 lname1 = load(file = "./data/SSCs_20180825.Rda");lname1

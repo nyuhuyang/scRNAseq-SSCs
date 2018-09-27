@@ -161,6 +161,8 @@ SSCs <- ScaleData(object = SSCs,#genes.use = SSCs@var.genes,
                   display.progress = T)
 SSCs@data =  readRDS("./data/SSCs_data.Rda")
 
+gene.use <- rownames(SSCs@scale.data);length(gene.use)
+SSCs@data = SSCs@data[gene.use,]
 #======1.7 unsupervised clustering =========================
 SSCs <- RunPCA(object = SSCs, pc.genes = SSCs@var.genes, pcs.compute = 100, 
                do.print = TRUE, pcs.print = 1:5, genes.print = 5)
@@ -170,17 +172,18 @@ PCHeatmap(SSCs, pc.use = c(1:3, 25:30), cells.use = 500, do.balanced = TRUE)
 SSCs <- RunTSNE(object = SSCs, reduction.use = "pca", dims.use = 1:30, 
                 do.fast = TRUE, perplexity= 30)
 
-SSCs <- FindClusters(object = SSCs, reduction.type = "pca", dims.use = 1:30, resolution = 0.8, 
+SSCs <- FindClusters(object = SSCs, reduction.type = "pca", dims.use = 1:30, 
+                     resolution = 0.8, 
                      k.param = 30,force.recalc = T,
                      save.SNN = TRUE, n.start = 100, nn.eps = 0, print.output = FALSE)
 #SSCs@meta.data$orig.ident <- gsub("PND18pre","PND18",SSCs@meta.data$orig.ident)
 TSNEPlot.1(object = SSCs, do.label = T, group.by = "ident", 
          do.return = TRUE, no.legend = T, 
          text.repel = T, label.repel = F,
-        colors.use = singler.colors,
+        #colors.use = singler.colors,
          pt.size = 1,label.size = 6 )+
         ggtitle("TSNEPlot, resolution = 0.8, k.param = 30")+
         theme(text = element_text(size=15),							
               plot.title = element_text(hjust = 0.5,size = 18, face = "bold")) 
-
-save(SSCs, file = "./data/SSCs_20180822.Rda")
+SSCs <- StashIdent(object = SSCs, save.name = "res.0.8")
+save(SSCs, file = "./data/SSCs_20180825.Rda")

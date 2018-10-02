@@ -9,7 +9,7 @@ library(dplyr)
 library(Matrix)
 library(sva)
 library(SingleR)
-source("./R/Seurat_functions.R")
+source("../R/Seurat_functions.R")
 ########################################################################
 #
 #  1 Data preprocessing
@@ -156,13 +156,14 @@ remove(m,com);GC()
 SSCs@data = readRDS("./data/Combat_data.Rda")
 SSCs@scale.data = NULL
 SSCs <- ScaleData(object = SSCs,#genes.use = SSCs@var.genes,
-                  model.use = "negbinom", do.par=T,
+                  model.use = "negbinom", do.par=T, do.center = T, do.scale = T,
                   vars.to.regress = c("CC.Difference"),#"CC.Difference","percent.mito"--nogood,"nUMI"--nogood
                   display.progress = T)
 SSCs@data =  readRDS("./data/SSCs_data.Rda")
 
 gene.use <- rownames(SSCs@scale.data);length(gene.use)
 SSCs@data = SSCs@data[gene.use,]
+#save(SSCs, file = "./data/SSCs_20181001.Rda") #do.center = F, do.scale = T
 #======1.7 unsupervised clustering =========================
 SSCs <- RunPCA(object = SSCs, pc.genes = SSCs@var.genes, pcs.compute = 100, 
                do.print = TRUE, pcs.print = 1:5, genes.print = 5)

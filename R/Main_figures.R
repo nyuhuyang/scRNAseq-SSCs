@@ -4,6 +4,11 @@ library(SingleR)
 library(dplyr)
 library(kableExtra)
 library(MAST)
+library(plyr)
+library(scales)
+library(gridExtra)
+library(grid)
+library(cowplot)
 source("../R/Seurat_functions.R")
 
 path <- paste("./output",gsub("-","",Sys.Date()),sep = "/")
@@ -90,15 +95,14 @@ SSCs_spermato <- SubsetData(SSCs,ident.use = major_cells)
 SSCs_spermato_markers = read.csv("./output/20180918/SSCs_spermato_markers.csv",
                                  header = T,stringsAsFactors =F)
 SSCs_spermato_markers %>% head(20) %>% kable() %>% kable_styling()
-marker = MouseGenes(SSCs_spermato,c("Gfra1", "Zbtb16", "Nanos2", "Utf1", "Sall4",
-                                    "Id4", "Sohlh1", "Kit", "Lin28a", "Pax7", "Dmrt1"))
+top <-  SSCs_spermato_markers %>% group_by(cluster) %>% top_n(250, avg_logFC)
 g1 <- DoHeatmap.1(SSCs_spermato, SSCs_spermato_markers, 
                   Top_n = 250, 
-                  #col.low = "#0000FF",col.mid = "#FFFFFF",col.high = "#FF0000",
+                  col.low = "#0000FF",col.mid = "#FFFFFF",col.high = "#FF0000",
                   group.order = major_cells, 
                   ident.use = "five types of germ cells",
                   draw.line = TRUE, cex.row = 0,#cex.row = 6,
-                  group.label.rot = T,remove.key =F,title.size = 12)
+                  group.label.rot = T,remove.key =F, title.size = 12)
 
 # 5.2.2. make color bar ========
 # combine cell types and time points =======
@@ -123,40 +127,41 @@ time_points1 <- c(paste("Spermatogonia",time_series),
 table(unique(as.vector(SSCs_spermato@ident)) %in% time_points1)
 SSCs_spermato@ident = factor(SSCs_spermato@ident,levels = time_points1)
 table(SSCs_spermato@ident)
-# make color bar
+
+# make bottom color bar==========
 Cell.Types1 <- data.frame("Cell.Types" = as.vector(SSCs_spermato@ident),
                         row.names = names(SSCs_spermato@ident))
 Cell.Types <- data.frame("Cell.Types" = as.vector(SSCs_spermato@meta.data$Cell.Types),
                           row.names = rownames(SSCs_spermato@meta.data))
 table(rownames(Cell.Types1) == rownames(Cell.Types))
-color_bar <- data.table::tstrsplit(Cell.Types1$Cell.Types,split = " ",keep = c(1,2))
-color_bar = as.data.frame(color_bar,col.names = c("major_cells","time_points"))
-color_bar$x <- 1:nrow(color_bar)
-color_bar$time_points = factor(color_bar$time,levels = time_series)
-head(color_bar)
-table(color_bar[color_bar$major_cells == "Spermatocytes","time_points"])
-table(color_bar$time_points)
-library(plyr)
+b_color_bar <- data.table::tstrsplit(Cell.Types1$Cell.Types,split = " ",keep = c(1,2))
+b_color_bar = as.data.frame(b_color_bar,col.names = c("major_cells","time_points"))
+b_color_bar$x <- 1:nrow(b_color_bar)
+b_color_bar$time_points = factor(b_color_bar$time_points,levels = time_series)
+head(b_color_bar)
+table(b_color_bar[b_color_bar$major_cells == "Spermatocytes","time_points"])
+table(b_color_bar$time_points)
+
 color = c("#53B400","#00C094","#00B6EB","#A58AFF","#FB61D7","#F8766D","#C49A00")
-MakeCorlorBar <- function(df, cell_type, color =NULL, remove.legend =T){
+MakeCorlorBar <- function(df, cell_type, color =NULL, remove.legend =F){
         df = df[(df$major_cells %in% cell_type),]
         g <- ggplot(data = df, aes(x, major_cells, fill = time_points)) +
-        geom_tile()+
-        theme_bw() + 
-        theme(panel.border = element_blank(),
-              panel.grid.major = element_blank(),
-              panel.grid.minor = element_blank(),
-              axis.line = element_blank(), 
-              axis.title.x=element_blank(),
-              axis.text.x=element_blank(),
-              axis.ticks.x=element_blank(),
-              axis.title.y=element_blank(),
-              axis.text.y=element_blank(),
-              axis.ticks.y=element_blank())
+                geom_tile()+
+                theme_bw() + 
+                theme(panel.border = element_blank(),
+                      panel.grid.major = element_blank(),
+                      panel.grid.minor = element_blank(),
+                      axis.line = element_blank(), 
+                      axis.title.x=element_blank(),
+                      axis.text.x=element_blank(),
+                      axis.ticks.x=element_blank(),
+                      axis.title.y=element_blank(),
+                      axis.text.y=element_blank(),
+                      axis.ticks.y=element_blank())
         if(remove.legend) g = g + theme(legend.position="none")
         if(!is.null(color)) {
                 colors_fill = color_scheme(color = color,
-                                           names = df$time_points)
+                                           names = unique(df$time_points))
                 g = g + scale_fill_manual(values = colors_fill)
         }
         g
@@ -171,28 +176,28 @@ color_scheme <- function(color,names){
         return(color_code)
         }
 
-library(scales)
 show_col(hue_pal()(7))
-table(color_bar[color_bar$major_cells == "Spermatids","time_points"])
-g_legend <- MakeCorlorBar(df = color_bar, cell_type = "Spermatogonia",
+table(b_color_bar[b_color_bar$major_cells == "Spermatids","time_points"])
+g_legend <- MakeCorlorBar(df = b_color_bar, cell_type = "Spermatogonia",
                           remove.legend = F, color = color)
-g_Spermatogonia <- MakeCorlorBar(df = color_bar, cell_type = "Spermatogonia",
+g_Spermatogonia <- MakeCorlorBar(df = b_color_bar, cell_type = "Spermatogonia",
                                  color = color)
-g_Early_Spermatocytes <- MakeCorlorBar(df = color_bar, cell_type = "Early_Spermatocytes",
+g_Early_Spermatocytes <- MakeCorlorBar(df = b_color_bar, cell_type = "Early_Spermatocytes",
                                  color = color)
-g_Spermatocytes <- MakeCorlorBar(df = color_bar, cell_type = "Spermatocytes",
+g_Spermatocytes <- MakeCorlorBar(df = b_color_bar, cell_type = "Spermatocytes",
                                        color = color)
-g_Round_Spermatids <- MakeCorlorBar(df = color_bar, cell_type = "Round_Spermatids",
+g_Round_Spermatids <- MakeCorlorBar(df = b_color_bar, cell_type = "Round_Spermatids",
                               color = color)
-g_Spermatids <- MakeCorlorBar(df = color_bar, cell_type = "Spermatids",
+g_Spermatids <- MakeCorlorBar(df = b_color_bar, cell_type = "Spermatids",
                                  color = color)
 library(ggpmisc)
 library(gridExtra)
+FindAllMarkers()
 # save ggplot
 path <- paste("./output",gsub("-","",Sys.Date()),sep = "/")
 dir.create(path, recursive = T)
 
-jpeg(paste0(path,"/3_heatmap_scale.jpeg"), units="in", width=10, height=7,res=600)
+jpeg(paste0(path,"/3_heatmap_scale_blue.red.jpeg"), units="in", width=10, height=7,res=600)
 g1 + theme(strip.text.x = element_text(margin=margin(t = 30, r = 0, b = 0, l = 0)))
 dev.off()
 
@@ -239,6 +244,7 @@ dev.off()
 #################################################################
 # 6.4.1 load data =======
 lname1 = load(file = "./data/SSCs_20180926.Rda"); lname1
+lname1 = load(file = "./data/SSCs_20181001.Rda") #do.center = F, do.scale = T
 table(SSCs@ident)
 SSCs@meta.data$orig.ident = gsub("PND18pre","PND18",SSCs@meta.data$orig.ident)
 table(SSCs@meta.data$orig.ident)
@@ -270,11 +276,12 @@ Spermatogonia_dev <- FindAllMarkers.UMI(Spermatogonia,only.pos = T,
                                         get.slot = "data")
 table(Spermatogonia_dev$cluster)
 write.csv2(Spermatogonia_dev, file = paste0(path,"/Spermatogonia_dev.data.csv"))
+Spermatogonia_dev = read.csv2("./output/20180926/Spermatogonia_dev.data.csv")
 
-Spermatogonia_dev <- FindAllMarkers.UMI(Spermatogonia,only.pos = T,
+Spermatogonia_dev1 <- FindAllMarkers.UMI(Spermatogonia,only.pos = T,
                                         get.slot = "scale.data")
-table(Spermatogonia_dev$cluster)
-write.csv2(Spermatogonia_dev, file = paste0(path,"/Spermatogonia_dev_scale.data.csv"))
+table(Spermatogonia_dev1$cluster)
+write.csv2(Spermatogonia_dev1, file = paste0(path,"/Spermatogonia_dev_scale.data.csv"))
 
 # 6.4.4 generate heatmap =======
 SSCs_spermato_markers = read.csv("./output/20180918/SSCs_spermato_markers.csv",
@@ -282,21 +289,50 @@ SSCs_spermato_markers = read.csv("./output/20180918/SSCs_spermato_markers.csv",
 table(SSCs_spermato_markers$cluster)
 Spermatogonia_marker = SSCs_spermato_markers[(SSCs_spermato_markers$cluster 
                                               %in% "Spermatogonia"),"gene"]
-Spermatogonia_dev1 = Spermatogonia_dev[(Spermatogonia_dev$pct.1>0.2),]
-marker = MouseGenes(Spermatogonia,c(Spermatogonia_marker[1:5],"Gfra1", "Zbtb16", "Nanos2", "Utf1", "Sall4",
+Spermatogonia_dev2 = Spermatogonia_dev[(Spermatogonia_dev$pct.1>0.1),]
+markers = MouseGenes(Spermatogonia,c(Spermatogonia_marker[1:20],"Gfra1", "Zbtb16",
+                                     "Nanos2", "Utf1", "Sall4",
                                     "Id4", "Sohlh1", "Kit", "Lin28a","Dmrt1"))
-top <-  Spermatogonia_dev1 %>% group_by(cluster) %>% top_n(15, avg_logFC)
-top %>% kable() %>% kable_styling()
-g2 <- DoHeatmap.1(Spermatogonia,Spermatogonia_dev1, 
-                  Top_n = 15, add.genes = marker,
-                  #col.low = "#0000FF",col.mid = "#FFFFFF",col.high = "#FF0000",
+markers = MouseGenes(Spermatogonia,c(Spermatogonia_marker[1:30]))
+g2 <- DoHeatmap.1(Spermatogonia, marker_df = Spermatogonia_dev2, 
+                  Top_n = 250, add.genes = markers,
+                  col.low = "#FF00FF",col.mid = "#000000", col.high = "#FFFF00",
+                  #col.low = "#FF00FF",col.mid = "#FFFFFF",col.high = "#FF0000",
                   group.order = time_series, 
-                  ident.use = "Spermatogonia @scale.data",
+                  ident.use = "Spermatogonia",
                   draw.line = TRUE, use.scaled = TRUE,
-                  group.label.rot = T,cex.row = 6,remove.key =T,
-                  title.size = 12)
-jpeg(paste0(path,"/4_Spermatogonia_dev_scale.data_pct.1>0.2.jpeg"), units="in", width=10, height=7,res=600)
+                  group.label.rot = T,cex.row = 0,remove.key =F,
+                  title.size = 12)+
+        theme(legend.text=element_text(size=7))
+# make color bar
+gene.use = rownames(Spermatogonia@scale.data);length(gene.use)
+top <-  Spermatogonia_dev2 %>% group_by(cluster) %>% top_n(250, avg_logFC)
+table(top$cluster)
+df_markers = data.frame("gene" = markers,
+                        "cluster" = "Spermatogonia\nMarkers")
+Cell.Types = top[,c("gene","cluster")]
+color_bar = rbind.data.frame(df_markers,Cell.Types)
+colnames(color_bar) = c("gene","time_points")
+color_bar = color_bar[!duplicated(color_bar$gene),]
+color_bar = color_bar[color_bar$gene %in% gene.use,]
+head(color_bar);dim(color_bar)
+color_bar$major_cells = "Spermatogonia"
+color_bar$time_points = factor(color_bar$time,levels = c("Spermatogonia\nMarkers",
+                                                         time_series))
+color_bar$x <- 1:nrow(color_bar)
+head(color_bar)
+color = c("#386CB0","#53B400","#00C094","#A58AFF","#F8766D")#,"#FB61D7","#F8766D","#C49A00")
+
+g_Spermatogonia <- MakeCorlorBar(df = color_bar, 
+                                 cell_type = "Spermatogonia",color=color) +
+                        coord_flip() + scale_x_reverse()
+
+jpeg(paste0(path,"/4_Spermatogonia_dev_data_pct.1>0.1.jpeg"), units="in", width=10, height=7,res=600)
 g2
+dev.off()
+
+jpeg(paste0(path,"/4_Spermatogonia_1.jpeg"), units="in", width=3, height=7,res=600)
+g_Spermatogonia
 dev.off()
 #################################################################
 #
@@ -330,30 +366,65 @@ TSNEPlot(Spermatocytes)
 Spermatocytes_dev <- FindAllMarkers.UMI(Spermatocytes,only.pos = T)
 table(Spermatocytes_dev$cluster)
 write.csv2(Spermatocytes_dev, file = paste0(path,"/Spermatocytes_dev.data.csv"))
+Spermatocytes_dev = read.csv2("./output/20180926/Spermatocytes_dev.data.csv",header = T)
 
-Spermatocytes_dev1 <- FindAllMarkers.UMI(Spermatogonia,only.pos = T,
+Spermatocytes_dev1 <- FindAllMarkers.UMI(Spermatocytes,only.pos = T,
                                         get.slot = "scale.data")
 table(Spermatocytes_dev1$cluster)
 write.csv2(Spermatocytes_dev1, file = paste0(path,"/Spermatocytes_dev_scale.data.csv"))
+Spermatocytes_dev1 = read.csv2("./output/20180926/Spermatocytes_dev_scale.data.csv",header = T)
 # 6.5.4 generate heatmap =======
 SSCs_spermato_markers = read.csv("./output/20180918/SSCs_spermato_markers.csv",
                                  header = T,stringsAsFactors =F)
 table(SSCs_spermato_markers$cluster)
 Spermatocytes_marker = SSCs_spermato_markers[(SSCs_spermato_markers$cluster 
                                               %in% "Spermatocytes"),"gene"]
-Spermatocytes_dev1 = Spermatocytes_dev1[(Spermatocytes_dev1$pct.1>0.1),]
-marker = MouseGenes(Spermatocytes,c(Spermatocytes_marker[1:15]))
-g1 <- DoHeatmap.1(Spermatocytes,Spermatocytes_dev1, 
-                  Top_n = 15, add.genes = marker,
-                  #col.low = "#0000FF",col.mid = "#FFFFFF",col.high = "#FF0000",
+Spermatocytes_dev2 = Spermatocytes_dev[(Spermatocytes_dev$pct.1>0.1),]
+
+markers = MouseGenes(Spermatocytes,c(Spermatocytes_marker[1:30]))
+
+g1 <- DoHeatmap.1(Spermatocytes, marker_df = Spermatocytes_dev2, 
+                  Top_n = 250, add.genes = markers,
+                  #col.low = "#FF00FF",col.mid = "#000000", col.high = "#FFFF00",
+                  col.low = "#FF00FF",col.mid = "#FFFFFF",col.high = "#FF0000",
                   group.order = time_series, 
-                  ident.use = "Spermatocytes development genes",
-                  draw.line = TRUE,
-                  group.label.rot = T,cex.row = 6,remove.key =T,title.size = 12)
-jpeg(paste0(path,"/5_Spermatocytes_dev_15>0.1.jpeg"), units="in", width=10, height=7,res=600)
+                  ident.use = "Spermatocytes",
+                  draw.line = TRUE, use.scaled = TRUE,
+                  group.label.rot = T,cex.row = 0,remove.key =F,
+                  title.size = 12)+
+        theme(legend.text=element_text(size=7))
+
+# make color bar
+gene.use = rownames(Spermatocytes@scale.data);length(gene.use)
+top <-  Spermatocytes_dev2 %>% group_by(cluster) %>% top_n(250, avg_logFC)
+table(top$cluster)
+df_markers = data.frame("gene" = markers,
+                        "cluster" = "Spermatocytes\nMarkers")
+Cell.Types = top[,c("gene","cluster")]
+color_bar = rbind.data.frame(df_markers,Cell.Types)
+colnames(color_bar) = c("gene","time_points")
+color_bar = color_bar[!duplicated(color_bar$gene),]
+color_bar = color_bar[color_bar$gene %in% gene.use,]
+head(color_bar);dim(color_bar)
+color_bar$major_cells = "Spermatocytes"
+color_bar$time_points = factor(color_bar$time,levels = c("Spermatocytes\nMarkers",
+                                                         time_series))
+color_bar$x <- 1:nrow(color_bar)
+head(color_bar)
+table(color_bar$time_points)
+color = c("#BF5B17","#00C094","#00B6EB","#A58AFF","#FB61D7","#F8766D","#C49A00")
+
+g_Spermatocytes <- MakeCorlorBar(df = color_bar, 
+                                 cell_type = "Spermatocytes",color=color) +
+        coord_flip() + scale_x_reverse()
+
+jpeg(paste0(path,"/5_Spermatocytes_dev_data_pct.1>0.1~.jpeg"), units="in", width=10, height=7,res=600)
 g1
 dev.off()
 
+jpeg(paste0(path,"/5_Spermatocytes_1.jpeg"), units="in", width=3, height=7,res=600)
+g_Spermatocytes
+dev.off()
 #################################################################
 #
 # Figure S1 – Data Quality Graphs
@@ -390,60 +461,56 @@ SSCs <- AddMetaData(object = SSCs, metadata = percent.mito, col.name = "percent.
 
 time_series <- c("PND06","PND14","PND18","PND25","PND30","Ad-depleteSp","Ad-Thy1")
 SSCs@ident = factor(SSCs@ident,levels = time_series)
-g1 <- VlnPlot(object = SSCs, features.plot = c("nGene", "nUMI", "percent.mito"), nCol = 1,
-              point.size.use = 0.2, 
+g1 <- VlnPlot.1(object = SSCs, features.plot = c("nGene", "nUMI", "percent.mito"), nCol = 1,
+              point.size.use = 0, group.by = "ident",x.lab = "Raw data",
               x.lab.rot = T, do.return = T,return.plotlist = T)
-g1_3 <- VlnPlot(object = SSCs, features.plot = c("percent.mito"), nCol = 1,
-              point.size.use = 0, 
-              x.lab.rot = T, do.return = T)
 SSCs1 <- FilterCells(object = SSCs, subset.names = c("nGene","nUMI","percent.mito"),
                     low.thresholds = c(500,2000, -Inf), 
                     high.thresholds = c(8000,125000, 0.15))
-
-g2 <- VlnPlot(object = SSCs1, features.plot = c("nGene", "nUMI", "percent.mito"), nCol = 1,
-              point.size.use = 0.2,
+g2 <- VlnPlot.1(object = SSCs1, features.plot = c("nGene", "nUMI", "percent.mito"), nCol = 1,
+              point.size.use = 0,x.lab = "After data filtration",
               x.lab.rot = T, do.return = T,return.plotlist = T)
-g2_3 <- VlnPlot(object = SSCs1, features.plot = c("percent.mito"), nCol = 1,
-              point.size.use = 0,
-              x.lab.rot = T, do.return = T)
 
-lname1 = load(file = "./data/SSCs_20180825.Rda");lname1
-table(SSCs@ident)
-SSCs <- SetAllIdent(object = SSCs, id = 'orig.ident')
-SSCs <- SubsetData(SSCs,ident.remove = "PND18pre")
-table(SSCs@ident)
-g3 <- VlnPlot(object = SSCs, features.plot = c("nGene", "nUMI", "percent.mito"), nCol = 1,
-              x.lab.rot = T, do.return = T, use.scaled = TRUE, group.by = "orig.ident",
-              return.plotlist = T)
-library(gridExtra)
-library(grid)
-jpeg(paste0(path,"/S1_QC_nGene.jpeg"), units="in", width=10, height=7,res=600)
-grid.arrange(g1[[1]],
-             g2[[1]]+ylim(0,10000),
-             #g3[[1]]+ylim(0,10000),
-        nrow = 1,
-        top = "nGene per library before filtering, after filtering"
+jpeg(paste0(path,"/S1_QC.jpeg"), units="in", width=10, height=7,res=600)
+plot_grid(g1[[1]]+coord_flip()+
+                     ylim(0,10000)+
+                     theme(axis.title.y=element_blank(),
+                           axis.text.y=element_blank(),
+                           axis.ticks.y=element_blank()),
+             g1[[2]]+coord_flip()+
+                     scale_y_log10(limits =c(1000,300000))+
+                     theme(axis.title.y=element_blank(),
+                           axis.text.y=element_blank(),
+                           axis.ticks.y=element_blank()),
+             g1[[3]]+coord_flip()+
+                     ylim(0,1)+
+                     theme(axis.title.y=element_blank(),
+                           axis.text.y=element_blank(),
+                           axis.ticks.y=element_blank()),
+             g2[[1]]+coord_flip()+
+                     ylim(0,10000)+
+                     theme(axis.title.y=element_blank(),
+                           axis.text.y=element_blank(),
+                           axis.ticks.y=element_blank()),
+             g2[[2]]+coord_flip()+
+                     scale_y_log10(limits =c(1000,300000))+
+                     theme(axis.title.y=element_blank(),
+                           axis.text.y=element_blank(),
+                           axis.ticks.y=element_blank()),
+             g2[[3]]+coord_flip()+
+                     #ylim(0,1)+
+                     theme(axis.title.y=element_blank(),
+                           axis.text.y=element_blank(),
+                           axis.ticks.y=element_blank()),
+        nrow = 2,align="hv"
 )
 dev.off()
 
-jpeg(paste0(path,"/S1_QC_nUMI.jpeg"), units="in", width=10, height=7,res=600)
-grid.arrange(g1[[2]]+scale_y_log10(limits =c(1000,300000)),
-             g2[[2]]+scale_y_log10(limits =c(1000,300000)),
-             #g3[[2]]+ylim(0,300000),
-             nrow = 1,
-             top = "nUMI per library before filtering, after filtering"
-)
+jpeg(paste0(path,"/S1_label.jpeg"), units="in", width=10, height=7,res=600)
+plot_grid(g1[[1]]+coord_flip(),
+             g2[[1]]+coord_flip(),
+             nrow = 2,align="hv")
 dev.off()
-
-jpeg(paste0(path,"/S1_QC_percent.mito_1.jpeg"), units="in", width=10, height=7,res=600)
-grid.arrange(g1_3+ylim(0,1),
-             g2_3+ylim(0,1),
-             #g3[[3]]+ylim(0,1),
-             nrow = 1,
-             top = "percent.mito per library before filtering, after filtering"
-)
-dev.off()
-
 #################################################################
 #
 # Figure S2A – tSNE plot of all clusters
@@ -496,4 +563,38 @@ jpeg(paste0(path,"/S2C_dotplot.jpeg"), units="in", width=10, height=7,
 DotPlot(SSCs, genes.plot = rev(markers.to.plot),
         cols.use = c("blue","red"), x.lab.rot = T, plot.legend = T,
         dot.scale = 8, do.return = T)
+dev.off()
+
+#################################################################
+#
+# Figure S3 – Distribution profiles of per-cell attributes compared across the 11 cell type
+#
+#################################################################
+lname1 = load(file = "./data/SSCs_20180926.Rda");lname1
+
+g1 <- VlnPlot.1(object = SSCs, features.plot = "nGene", nCol = 1,x.lab = "",
+              x.lab.rot = T, do.return = T, use.scaled = TRUE, group.by = "ident",
+              point.size.use = 0,)+coord_flip() 
+g2 <- VlnPlot.1(object = SSCs, features.plot = "nUMI", nCol = 1,,x.lab = "",
+              x.lab.rot = T, do.return = T, use.scaled = TRUE, group.by = "ident",
+              point.size.use = 0,)+coord_flip() 
+g3 <- VlnPlot(object = SSCs, features.plot = "percent.mito", nCol = 1,
+              x.lab.rot = T, do.return = T, use.scaled = TRUE, group.by = "ident",
+              point.size.use = 0,)+coord_flip() 
+jpeg(paste0(path,"/S3_Distribution_profiles.jpeg"), units="in", width=10, height=7,res=600)
+plot_grid(g1 +theme(axis.title.y=element_blank(),
+                       axis.text.y=element_blank(),
+                       axis.ticks.y=element_blank()),
+          g2 +theme(axis.title.y=element_blank(),
+                       axis.text.y=element_blank(),
+                       axis.ticks.y=element_blank()),
+          g3 + theme(axis.title.y=element_blank(),
+                     axis.text.y=element_blank(),
+                     axis.ticks.y=element_blank()),
+          nrow = 1,align="hv")
+dev.off()
+
+jpeg(paste0(path,"/S3_label.jpeg"), units="in", width=10, height=7,res=600)
+plot_grid(g2,
+          nrow = 1,align="hv")
 dev.off()

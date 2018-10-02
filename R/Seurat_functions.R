@@ -106,7 +106,7 @@ DoHeatmap.1 <- function(object, marker_df, add.genes = NULL, Top_n = 10, group.o
                 top$gene = NULL
         }
         if(!is.null(add.genes)) {
-                top_gene = c(add.genes, "Odf2",top$gene)
+                top_gene = c(add.genes, top$gene)
         } else top_gene <- top$gene
         return(DoHeatmap(object = object, genes.use = top_gene,
                          group.order = group.order, use.scaled = use.scaled,
@@ -483,9 +483,9 @@ FindMarkers.UMI <- function (object, ident.1, ident.2 = NULL, genes.use = NULL,
                                   print.bar = print.bar, min.cells.gene = min.cells.gene,
                                   latent.vars = latent.vars, max.cells.per.ident = max.cells.per.ident,
                                   get.slot = get.slot, ...)
-        UMI.1 <-rowMeans(as.matrix(x = object@data[, WhichCells(object = object,
+        UMI.1 <-rowMeans(as.matrix(x = object@raw.data[, WhichCells(object = object,
                                                                 ident = ident.1)]))
-        UMI.2 <-rowMeans(as.matrix(x = object@data[, WhichCells(object = object,
+        UMI.2 <-rowMeans(as.matrix(x = object@raw.data[, WhichCells(object = object,
                                                                 ident.remove = ident.1)]))
         avg_UMI <-data.frame(UMI.1, UMI.2)
         genes.de <- cbind(genes.de,avg_UMI[match(rownames(genes.de),rownames(avg_UMI)),])
@@ -1046,6 +1046,86 @@ SingleFeaturePlot.1 <- function (object = object, feature = feature, pt.size = 1
 }
 
 
+# add x.lab
+SingleVlnPlot.1 <- function (feature, data, cell.ident, do.sort, y.max, size.x.use, 
+          size.y.use, size.title.use, adjust.use, point.size.use, x.lab,
+          cols.use, gene.names, y.log, x.lab.rot, y.lab.rot, legend.position, 
+          remove.legend) 
+{
+        feature.name <- colnames(data)
+        colnames(data) <- "feature"
+        feature <- "feature"
+        set.seed(seed = 42)
+        data$ident <- cell.ident
+        if (do.sort) {
+                data$ident <- factor(x = data$ident, 
+                                     levels = names(x = rev(x = sort(x = tapply(X = data[,feature],
+                                                                                INDEX = data$ident,
+                                                                                FUN = mean)))))
+        }
+        if (y.log) {
+                noise <- rnorm(n = length(x = data[, feature]))/200
+                data[, feature] <- data[, feature] + 1
+        }
+        else {
+                noise <- rnorm(n = length(x = data[, feature]))/1e+05
+        }
+        if (all(data[, feature] == data[, feature][1])) {
+                warning(paste0("All cells have the same value of ", 
+                               feature, "."))
+        }
+        else {
+                data[, feature] <- data[, feature] + noise
+        }
+        y.max <- Seurat:::SetIfNull(x = y.max, default = max(data[, feature]))
+        plot <- ggplot(data = data, mapping = aes(x = factor(x = ident), 
+                                                  y = feature)) + 
+                geom_violin(scale = "width", adjust = adjust.use,
+                            trim = TRUE, mapping = aes(fill = factor(x = ident))) + 
+                guides(fill = guide_legend(title = NULL)) + xlab(x.lab) + 
+                Seurat:::NoGrid() + ggtitle(feature) + theme(plot.title = element_text(size = size.title.use, 
+                                                                              face = "bold"), legend.position = legend.position, axis.title.x = element_text(face = "bold", 
+                                                                                                                                                             colour = "#990000", size = size.x.use), axis.title.y = element_text(face = "bold", 
+                                                                                                                                                                                                                                 colour = "#990000", size = size.y.use))
+        if (point.size.use != 0) {
+                plot <- plot + geom_jitter(height = 0, size = point.size.use)
+        }
+        plot <- plot + ggtitle(feature.name)
+        if (y.log) {
+                plot <- plot + scale_y_log10()
+        }
+        else {
+                plot <- plot + ylim(min(data[, feature]), y.max)
+        }
+        if (feature %in% gene.names) {
+                if (y.log) {
+                        plot <- plot + ylab(label = "Log Expression level")
+                }
+                else {
+                        plot <- plot + ylab(label = "Expression level")
+                }
+        }
+        else {
+                plot <- plot + ylab(label = "")
+        }
+        if (!is.null(x = cols.use)) {
+                plot <- plot + scale_fill_manual(values = cols.use)
+        }
+        if (x.lab.rot) {
+                plot <- plot + theme(axis.text.x = element_text(angle = 45, 
+                                                                hjust = 1, size = size.x.use))
+        }
+        if (y.lab.rot) {
+                plot <- plot + theme(axis.text.x = element_text(angle = 90, 
+                                                                size = size.y.use))
+        }
+        if (remove.legend) {
+                plot <- plot + theme(legend.position = "none")
+        }
+        return(plot)
+}
+
+
 #' Split seurat cell names by certein criteria
 #' A supporting funtion to SplitSeurat
 #' @param object Seurat object
@@ -1255,6 +1335,94 @@ SplitDotPlotGG.1 <- function (object, grouping.var, genes.plot,
         suppressWarnings(print(p))
         if (do.return) {
                 return(p)
+        }
+}
+
+# add x.lab
+VlnPlot.1 <- function (object, features.plot, ident.include = NULL, nCol = NULL, 
+          do.sort = FALSE, y.max = NULL, same.y.lims = FALSE, size.x.use = 16, 
+          size.y.use = 16, size.title.use = 20, adjust.use = 1, point.size.use = 1, 
+          cols.use = NULL, group.by = NULL, y.log = FALSE, x.lab.rot = FALSE, 
+          y.lab.rot = FALSE, legend.position = "right", single.legend = TRUE, 
+          remove.legend = FALSE, do.return = FALSE, return.plotlist = FALSE, 
+          x.lab = "Identity",...) 
+{
+        if (is.null(x = nCol)) {
+                if (length(x = features.plot) > 9) {
+                        nCol <- 4
+                }
+                else {
+                        nCol <- min(length(x = features.plot), 3)
+                }
+        }
+        data.use <- data.frame(FetchData(object = object, vars.all = features.plot, 
+                                         ...), check.names = F)
+        if (is.null(x = ident.include)) {
+                cells.to.include <- object@cell.names
+        }
+        else {
+                cells.to.include <- WhichCells(object = object, ident = ident.include)
+        }
+        data.use <- data.use[cells.to.include, , drop = FALSE]
+        if (!is.null(x = group.by)) {
+                ident.use <- as.factor(x = FetchData(object = object, 
+                                                     vars.all = group.by)[cells.to.include, 1])
+        }
+        else {
+                ident.use <- object@ident[cells.to.include]
+        }
+        gene.names <- colnames(x = data.use)[colnames(x = data.use) %in% 
+                                                     rownames(x = object@data)]
+        if (single.legend) {
+                remove.legend <- TRUE
+        }
+        if (same.y.lims && is.null(x = y.max)) {
+                y.max <- max(data.use)
+        }
+        plots <- lapply(X = features.plot, FUN = function(x) {
+                return(SingleVlnPlot.1(feature = x, data = data.use[,x, drop = FALSE], cell.ident = ident.use, do.sort = do.sort, 
+                                     y.max = y.max, size.x.use = size.x.use, size.y.use = size.y.use, 
+                                     size.title.use = size.title.use, adjust.use = adjust.use, 
+                                     point.size.use = point.size.use, cols.use = cols.use, 
+                                     gene.names = gene.names, y.log = y.log, x.lab.rot = x.lab.rot, 
+                                     y.lab.rot = y.lab.rot, legend.position = legend.position, 
+                                     remove.legend = remove.legend, x.lab = x.lab))
+        })
+        if (length(x = features.plot) > 1) {
+                plots.combined <- plot_grid(plotlist = plots, ncol = nCol)
+                if (single.legend && !remove.legend) {
+                        legend <- get_legend(plot = plots[[1]] + theme(legend.position = legend.position))
+                        if (legend.position == "bottom") {
+                                plots.combined <- plot_grid(plots.combined, 
+                                                            legend, ncol = 1, rel_heights = c(1, 0.2))
+                        }
+                        else if (legend.position == "right") {
+                                plots.combined <- plot_grid(plots.combined, 
+                                                            legend, rel_widths = c(3, 0.3))
+                        }
+                        else {
+                                warning("Shared legends must be at the bottom or right of the plot")
+                        }
+                }
+        }
+        else {
+                plots.combined <- plots[[1]]
+        }
+        if (do.return) {
+                if (return.plotlist) {
+                        return(plots)
+                }
+                else {
+                        return(plots.combined)
+                }
+        }
+        else {
+                if (length(x = plots.combined) > 1) {
+                        plots.combined
+                }
+                else {
+                        invisible(x = lapply(X = plots.combined, FUN = print))
+                }
         }
 }
 

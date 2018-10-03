@@ -96,6 +96,7 @@ SSCs_spermato_markers = read.csv("./output/20180918/SSCs_spermato_markers.csv",
                                  header = T,stringsAsFactors =F)
 SSCs_spermato_markers %>% head(20) %>% kable() %>% kable_styling()
 top <-  SSCs_spermato_markers %>% group_by(cluster) %>% top_n(250, avg_logFC)
+write.csv2(top[!duplicated(top$gene),],paste0(path,"/Fig_3_five_germ_cell_types.csv"))
 g1 <- DoHeatmap.1(SSCs_spermato, SSCs_spermato_markers, 
                   Top_n = 250, 
                   col.low = "#0000FF",col.mid = "#FFFFFF",col.high = "#FF0000",
@@ -321,6 +322,7 @@ color_bar$time_points = factor(color_bar$time,levels = c("Spermatogonia\nMarkers
                                                          time_series))
 color_bar$x <- 1:nrow(color_bar)
 head(color_bar)
+write.csv2(color_bar,paste0(path,"/Fig_4_spermatogonia_GOI.csv"))
 color = c("#386CB0","#53B400","#00C094","#A58AFF","#F8766D")#,"#FB61D7","#F8766D","#C49A00")
 
 g_Spermatogonia <- MakeCorlorBar(df = color_bar, 
@@ -412,6 +414,8 @@ color_bar$time_points = factor(color_bar$time,levels = c("Spermatocytes\nMarkers
 color_bar$x <- 1:nrow(color_bar)
 head(color_bar)
 table(color_bar$time_points)
+write.csv2(color_bar,paste0(path,"/Fig_5_Spermatocytes_GOI.csv"))
+
 color = c("#BF5B17","#00C094","#00B6EB","#A58AFF","#FB61D7","#F8766D","#C49A00")
 
 g_Spermatocytes <- MakeCorlorBar(df = color_bar, 
@@ -598,3 +602,68 @@ jpeg(paste0(path,"/S3_label.jpeg"), units="in", width=10, height=7,res=600)
 plot_grid(g2,
           nrow = 1,align="hv")
 dev.off()
+
+#################################################################
+#
+# Figure S4 – tsne plot 
+#
+#################################################################
+
+lname1 = load(file = "./data/SSCs_20180926.Rda");lname1
+table(SSCs@ident)
+major_cells <- c("Spermatogonia","Early Spermatocytes","Spermatocytes",
+                 "Round Spermatids","Spermatids")
+SSCs_spermato <- SubsetData(SSCs,ident.use = major_cells)
+g <- list()
+Somatic_markers <- MouseGenes(SSCs,c("Acta2","Col1a2","Vcam1","Insl3","Laptm5",
+                                     "Hbb-bt","Ptgds","Wt1","Col1a1"))
+GermCell_markers <- MouseGenes(SSCs,c("Gfra1","Zbtb16","Sall4","Dmrt1","Dazl","Kit","Cdca8",
+                                      "Id4","Sycp3","Mtl5","Nxt1","Shcbp1l","Aurka","Lyzl1",
+                                      "Acrv1","Hemgn","Txndc8","Tssk6","Oaz3","Prm2"))
+
+g[[1]] = TSNEPlot.1(object = SSCs_spermato,do.label = T, group.by = "ident",
+           do.return = TRUE, no.legend = T,colors.use = singler.colors,
+           pt.size = 1,label.size = 5,label.repel = T, force = 5)+
+        ggtitle("tSNE plot of five germ cells")+
+        theme(text = element_text(size=20),
+              plot.title = element_text(hjust = 0.5, face = "bold"))
+# Somatic_markers 
+g[[2]] = SingleFeaturePlot.1(object = SSCs_spermato, "Acta2", threshold = 1)
+g[[3]] = SingleFeaturePlot.1(object = SSCs_spermato, "Col1a2")
+g[[4]] = SingleFeaturePlot.1(object = SSCs_spermato, "Vcam1")
+g[[5]] = SingleFeaturePlot.1(object = SSCs_spermato, "Insl3")
+g[[6]] = SingleFeaturePlot.1(object = SSCs_spermato, "Laptm5")
+g[[7]] = SingleFeaturePlot.1(object = SSCs_spermato, "Hbb-bt", threshold = 1.5)
+g[[8]] = SingleFeaturePlot.1(object = SSCs_spermato, "Ptgds")
+g[[9]] = SingleFeaturePlot.1(object = SSCs_spermato, "Wt1", threshold = 1.5)
+g[[10]] = SingleFeaturePlot.1(object = SSCs_spermato, "Col1a1", threshold = 1.5)
+# GermCell_markers
+g[[11]] = SingleFeaturePlot.1(object = SSCs_spermato, "Gfra1", threshold = 0.1)
+g[[12]] = SingleFeaturePlot.1(object = SSCs_spermato, "Zbtb16", threshold = 1.5)
+g[[13]] = SingleFeaturePlot.1(object = SSCs_spermato, "Sall4", threshold = 1)
+g[[14]] = SingleFeaturePlot.1(object = SSCs_spermato, "Dmrt1", threshold = 0.1)
+g[[15]] = SingleFeaturePlot.1(object = SSCs_spermato, "Dazl", threshold = 2.0)
+g[[16]] = SingleFeaturePlot.1(object = SSCs_spermato, "Kit", threshold = 0.1)
+g[[17]] = SingleFeaturePlot.1(object = SSCs_spermato, "Id4", threshold = 0.8)
+g[[18]] = SingleFeaturePlot.1(object = SSCs_spermato, "Cdca8", threshold = 1.0)
+g[[19]] = SingleFeaturePlot.1(object = SSCs_spermato, "Sycp3", threshold = 1.5)
+g[[20]] = SingleFeaturePlot.1(object = SSCs_spermato, "Mtl5", threshold = 1.0)
+g[[21]] = SingleFeaturePlot.1(object = SSCs_spermato, "Nxt1", threshold = 1.8)
+g[[22]] = SingleFeaturePlot.1(object = SSCs_spermato, "Shcbp1l", threshold = 1.5)
+g[[23]] = SingleFeaturePlot.1(object = SSCs_spermato, "Aurka", threshold = 1.5)
+g[[24]] = SingleFeaturePlot.1(object = SSCs_spermato, "Lyzl1", threshold = 1.5)
+g[[25]] = SingleFeaturePlot.1(object = SSCs_spermato, "Acrv1", threshold = 1.5)
+g[[26]] = SingleFeaturePlot.1(object = SSCs_spermato, "Hemgn", threshold = 1.5)
+g[[27]] = SingleFeaturePlot.1(object = SSCs_spermato, "Txndc8", threshold = 1.5)
+g[[28]] = SingleFeaturePlot.1(object = SSCs_spermato, "Tssk6", threshold = 1.5)
+g[[29]] = SingleFeaturePlot.1(object = SSCs_spermato, "Oaz3", threshold = 1.5)
+g[[30]] = SingleFeaturePlot.1(object = SSCs_spermato, "Prm2", threshold = 3.5)
+
+file_names = c("five_germ_cells",Somatic_markers,GermCell_markers)
+length(file_names[c(1,11:30)])
+for (i in c(1,11:30)) {
+        ggplot2::ggsave(filename = paste0("S4_",file_names[i],".jpeg"),
+                        plot = g[[i]], path = path,
+               units="in", width=10, height=7, dpi=600
+        )
+}

@@ -279,6 +279,9 @@ table(Spermatogonia_dev$cluster)
 write.csv2(Spermatogonia_dev, file = paste0(path,"/Spermatogonia_dev.data.csv"))
 Spermatogonia_dev = read.csv2("./output/20180926/Spermatogonia_dev.data.csv")
 
+write.csv2(Spermatogonia_dev[(Spermatogonia_dev$gene %in% genes.use),], 
+           file = paste0(path,"/Spermatogonia_dev_remove_Spermatid.data.csv"))
+
 Spermatogonia_dev1 <- FindAllMarkers.UMI(Spermatogonia,only.pos = T,
                                         get.slot = "scale.data")
 table(Spermatogonia_dev1$cluster)
@@ -571,7 +574,7 @@ dev.off()
 
 #################################################################
 #
-# Figure S3 – Distribution profiles of per-cell attributes compared across the 11 cell type
+# Figure S3 Distribution profiles
 #
 #################################################################
 lname1 = load(file = "./data/SSCs_20180926.Rda");lname1
@@ -628,15 +631,15 @@ g[[1]] = TSNEPlot.1(object = SSCs_spermato,do.label = T, group.by = "ident",
         theme(text = element_text(size=20),
               plot.title = element_text(hjust = 0.5, face = "bold"))
 # Somatic_markers 
-g[[2]] = SingleFeaturePlot.1(object = SSCs_spermato, "Acta2", threshold = 1)
-g[[3]] = SingleFeaturePlot.1(object = SSCs_spermato, "Col1a2")
-g[[4]] = SingleFeaturePlot.1(object = SSCs_spermato, "Vcam1")
-g[[5]] = SingleFeaturePlot.1(object = SSCs_spermato, "Insl3")
-g[[6]] = SingleFeaturePlot.1(object = SSCs_spermato, "Laptm5")
-g[[7]] = SingleFeaturePlot.1(object = SSCs_spermato, "Hbb-bt", threshold = 1.5)
-g[[8]] = SingleFeaturePlot.1(object = SSCs_spermato, "Ptgds")
-g[[9]] = SingleFeaturePlot.1(object = SSCs_spermato, "Wt1", threshold = 1.5)
-g[[10]] = SingleFeaturePlot.1(object = SSCs_spermato, "Col1a1", threshold = 1.5)
+g[[2]] = SingleFeaturePlot.1(object = SSCs, "Acta2", threshold = 1)
+g[[3]] = SingleFeaturePlot.1(object = SSCs, "Col1a2")
+g[[4]] = SingleFeaturePlot.1(object = SSCs, "Vcam1")
+g[[5]] = SingleFeaturePlot.1(object = SSCs, "Insl3")
+g[[6]] = SingleFeaturePlot.1(object = SSCs, "Laptm5")
+g[[7]] = SingleFeaturePlot.1(object = SSCs, "Hbb-bt", threshold = 1.5)
+g[[8]] = SingleFeaturePlot.1(object = SSCs, "Ptgds")
+g[[9]] = SingleFeaturePlot.1(object = SSCs, "Wt1", threshold = 1.5)
+g[[10]] = SingleFeaturePlot.1(object = SSCs, "Col1a1", threshold = 1.5)
 # GermCell_markers
 g[[11]] = SingleFeaturePlot.1(object = SSCs_spermato, "Gfra1", threshold = 0.1)
 g[[12]] = SingleFeaturePlot.1(object = SSCs_spermato, "Zbtb16", threshold = 1.5)
@@ -660,10 +663,22 @@ g[[29]] = SingleFeaturePlot.1(object = SSCs_spermato, "Oaz3", threshold = 1.5)
 g[[30]] = SingleFeaturePlot.1(object = SSCs_spermato, "Prm2", threshold = 3.5)
 
 file_names = c("five_germ_cells",Somatic_markers,GermCell_markers)
-length(file_names[c(1,11:30)])
-for (i in c(1,11:30)) {
+length(file_names)
+for (i in c(1:30)) {
         ggplot2::ggsave(filename = paste0("S4_",file_names[i],".jpeg"),
                         plot = g[[i]], path = path,
                units="in", width=10, height=7, dpi=600
         )
 }
+
+#################################################################
+#
+# upload to GEO
+#
+#################################################################
+
+path <- paste("./output",gsub("-","",Sys.Date()),sep = "/")
+dir.create(path, recursive = T)
+
+lname1 = load(file = "./data/SSCs_20180926.Rda");lname1
+write.csv2(SSCs@meta.data,paste0(path,"/meta_data.csv"))

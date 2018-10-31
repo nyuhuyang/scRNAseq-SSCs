@@ -12,7 +12,8 @@ library(cowplot)
 source("../R/Seurat_functions.R")
 
 path <- paste("./output",gsub("-","",Sys.Date()),sep = "/")
-dir.create(path, recursive = T)
+if(!dir.exists(path)) dir.create(path, recursive = T)
+
 #################################################################
 #
 # Figure 1 B) Germ cell composition per library (bar chart)
@@ -92,7 +93,7 @@ SSCs_spermato <- SubsetData(SSCs,ident.use = major_cells)
 
 # 5.2.1 generate heatmap =======
 # run 4.2.1 script
-SSCs_spermato_markers = read.csv("./output/20180918/SSCs_spermato_markers.csv",
+SSCs_spermato_markers = read.csv("./output/20181030/SSCs_spermato_markers.csv",
                                  header = T,stringsAsFactors =F)
 SSCs_spermato_markers %>% head(20) %>% kable() %>% kable_styling()
 top <-  SSCs_spermato_markers %>% group_by(cluster) %>% top_n(250, avg_logFC)
@@ -126,6 +127,7 @@ time_points1 <- c(paste("Spermatogonia",time_series),
                   paste("Round_Spermatids", time_series[-c(1,2)]),
                   paste("Spermatids", time_series[-c(1,2)]))
 table(unique(as.vector(SSCs_spermato@ident)) %in% time_points1)
+SSCs_spermato@ident = factor(SSCs_spermato@ident,levels = time_points1)
 SSCs_spermato@ident = factor(SSCs_spermato@ident,levels = time_points1)
 table(SSCs_spermato@ident)
 
@@ -246,6 +248,7 @@ dev.off()
 # 6.4.1 load data =======
 lname1 = load(file = "./data/SSCs_20180926.Rda"); lname1
 lname1 = load(file = "./data/SSCs_20181001.Rda") #do.center = F, do.scale = T
+lname1 = load(file = "./data/SSCs_20181030.Rda") #.scale with median
 table(SSCs@ident)
 SSCs@meta.data$orig.ident = gsub("PND18pre","PND18",SSCs@meta.data$orig.ident)
 table(SSCs@meta.data$orig.ident)
@@ -253,14 +256,13 @@ table(SSCs@meta.data$orig.ident)
 Spermatogonia <- SubsetData(SSCs,ident.use = "Spermatogonia")
 
 # 6.4.2 remove spermatid contaminated transcripts =======
-#Spermatid_Genes_to_Filter <- readxl::read_excel("./doc/Spermatid Genes to Filter.xlsx")
-#Spermatid_Genes = Spermatid_Genes_to_Filter$`Completely Spermatid Gene List To Remove (Spermatid/Other UMI Ratio > 20; and GSEA and tSNEs)`
-#genes.use = rownames(Spermatogonia@data); length(genes.use)
-#table(Spermatid_Genes %in% genes.use)
-#genes.use = genes.use[!(genes.use %in% Spermatid_Genes)]; length(genes.use)
-#Spermatogonia@raw.data = Spermatogonia@raw.data[genes.use, ]
-#Spermatogonia@data = Spermatogonia@data[genes.use, ]
-
+Spermatid_Genes_to_Filter <- readxl::read_excel("./doc/Spermatid Genes to Filter.xlsx")
+Spermatid_Genes = Spermatid_Genes_to_Filter$`Completely Spermatid Gene List To Remove (Spermatid/Other UMI Ratio > 20; and GSEA and tSNEs)`
+genes.use = rownames(Spermatogonia@data); length(genes.use)
+table(Spermatid_Genes %in% genes.use)
+genes.use = genes.use[!(genes.use %in% Spermatid_Genes)]; length(genes.use)
+Spermatogonia@data = Spermatogonia@data[genes.use, ]
+Spermatogonia@scale.data = Spermatogonia@scale.data[genes.use, ]
 # 6.4.3 merge ident and find development genes =======
 table(Spermatogonia@meta.data$orig.ident)
 Spermatogonia@meta.data$orig.ident = gsub("PND18|PND25|PND30",
@@ -268,7 +270,6 @@ Spermatogonia@meta.data$orig.ident = gsub("PND18|PND25|PND30",
 Spermatogonia@meta.data$orig.ident = gsub("Ad-depleteSp|Ad-Thy1",
                                      "Adult",Spermatogonia@meta.data$orig.ident)
 Spermatogonia <- SetAllIdent.1(object = Spermatogonia, id = 'orig.ident')
-#Spermatogonia <- SubsetData(Spermatogonia,ident.remove = "PND18-30pre")
 table(Spermatogonia@ident)
 time_series <- c("PND06","PND14","PND18-30","Adult")
 Spermatogonia@ident = factor(Spermatogonia@ident,levels = time_series)
@@ -276,19 +277,11 @@ TSNEPlot(Spermatogonia)
 Spermatogonia_dev <- FindAllMarkers.UMI(Spermatogonia,only.pos = T,
                                         get.slot = "data")
 table(Spermatogonia_dev$cluster)
-write.csv2(Spermatogonia_dev, file = paste0(path,"/Spermatogonia_dev.data.csv"))
-Spermatogonia_dev = read.csv2("./output/20180926/Spermatogonia_dev.data.csv")
-
-write.csv2(Spermatogonia_dev[(Spermatogonia_dev$gene %in% genes.use),], 
-           file = paste0(path,"/Spermatogonia_dev_remove_Spermatid.data.csv"))
-
-Spermatogonia_dev1 <- FindAllMarkers.UMI(Spermatogonia,only.pos = T,
-                                        get.slot = "scale.data")
-table(Spermatogonia_dev1$cluster)
-write.csv2(Spermatogonia_dev1, file = paste0(path,"/Spermatogonia_dev_scale.data.csv"))
+write.csv(Spermatogonia_dev, file = paste0(path,"/Spermatogonia_dev_data_mean~.csv"))
+Spermatogonia_dev = read.csv("./output/20181030/Spermatogonia_dev_data_mean~.csv")
 
 # 6.4.4 generate heatmap =======
-SSCs_spermato_markers = read.csv("./output/20180918/SSCs_spermato_markers.csv",
+SSCs_spermato_markers = read.csv("./output/20181030/SSCs_spermato_markers.csv",
                                  header = T,stringsAsFactors =F)
 table(SSCs_spermato_markers$cluster)
 Spermatogonia_marker = SSCs_spermato_markers[(SSCs_spermato_markers$cluster 
@@ -325,18 +318,18 @@ color_bar$time_points = factor(color_bar$time,levels = c("Spermatogonia\nMarkers
                                                          time_series))
 color_bar$x <- 1:nrow(color_bar)
 head(color_bar)
-write.csv2(color_bar,paste0(path,"/Fig_4_spermatogonia_GOI.csv"))
+write.csv2(color_bar,paste0(path,"/Fig_4_spermatogonia_GOI_mean~.csv"))
 color = c("#386CB0","#53B400","#00C094","#A58AFF","#F8766D")#,"#FB61D7","#F8766D","#C49A00")
 
 g_Spermatogonia <- MakeCorlorBar(df = color_bar, 
                                  cell_type = "Spermatogonia",color=color) +
                         coord_flip() + scale_x_reverse()
 
-jpeg(paste0(path,"/4_Spermatogonia_dev_data_pct.1>0.1.jpeg"), units="in", width=10, height=7,res=600)
+jpeg(paste0(path,"/4_Spermatogonia_dev_data_mean~.jpeg"), units="in", width=10, height=7,res=600)
 g2
 dev.off()
 
-jpeg(paste0(path,"/4_Spermatogonia_1.jpeg"), units="in", width=3, height=7,res=600)
+jpeg(paste0(path,"/4_Spermatogonia_mean~.jpeg"), units="in", width=3, height=7,res=600)
 g_Spermatogonia
 dev.off()
 #################################################################
@@ -346,20 +339,20 @@ dev.off()
 #################################################################
 # 6.5.1 load data =======
 lname1 = load(file = "./data/SSCs_20180926.Rda"); lname1
+lname1 = load(file = "./data/SSCs_20181029.Rda") #.scale with median
 table(SSCs@ident)
 table(SSCs@meta.data$orig.ident)
-SSCs@meta.data$orig.ident = gsub("PND18pre","PND18",SSCs@meta.data$orig.ident)
+#SSCs@meta.data$orig.ident = gsub("PND18pre","PND18",SSCs@meta.data$orig.ident)
 Spermatocytes <- SubsetData(SSCs,ident.use = "Spermatocytes")
 
 # 6.5.2 remove spermatid contaminated transcripts =======
-#Spermatid_Genes_to_Filter <- readxl::read_excel("./doc/Spermatid Genes to Filter.xlsx")
-#Spermatid_Genes = Spermatid_Genes_to_Filter$`Completely Spermatid Gene List To Remove (Spermatid/Other UMI Ratio > 20; and GSEA and tSNEs)`
-#genes.use = rownames(Spermatocytes@data); length(genes.use)
-#table(Spermatid_Genes %in% genes.use)
-#genes.use = genes.use[!(genes.use %in% Spermatid_Genes)]; length(genes.use)
-#Spermatocytes@raw.data = Spermatocytes@raw.data[genes.use, ]
-#Spermatocytes@data = Spermatocytes@data[genes.use, ]
-
+Spermatid_Genes_to_Filter <- readxl::read_excel("./doc/Spermatid Genes to Filter.xlsx")
+Spermatid_Genes = Spermatid_Genes_to_Filter$`Completely Spermatid Gene List To Remove (Spermatid/Other UMI Ratio > 20; and GSEA and tSNEs)`
+genes.use = rownames(Spermatocytes@data); length(genes.use)
+table(Spermatid_Genes %in% genes.use)
+genes.use = genes.use[!(genes.use %in% Spermatid_Genes)]; length(genes.use)
+Spermatocytes@data = Spermatocytes@data[genes.use, ]
+Spermatocytes@scale.data = Spermatocytes@scale.data[genes.use, ]
 # 6.5.3 merge ident and find development genes =======
 table(Spermatocytes@meta.data$orig.ident)
 table(Spermatocytes@ident)
@@ -368,16 +361,11 @@ time_series <- c("PND14","PND18","PND25","PND30","Ad-depleteSp","Ad-Thy1")
 Spermatocytes@ident = factor(Spermatocytes@ident,levels = time_series)
 TSNEPlot(Spermatocytes)
 
-Spermatocytes_dev <- FindAllMarkers.UMI(Spermatocytes,only.pos = T)
+Spermatocytes_dev <- FindAllMarkers.UMI(Spermatocytes,only.pos = T,
+                                        get.slot = "data")
 table(Spermatocytes_dev$cluster)
-write.csv2(Spermatocytes_dev, file = paste0(path,"/Spermatocytes_dev.data.csv"))
-Spermatocytes_dev = read.csv2("./output/20180926/Spermatocytes_dev.data.csv",header = T)
-
-Spermatocytes_dev1 <- FindAllMarkers.UMI(Spermatocytes,only.pos = T,
-                                        get.slot = "scale.data")
-table(Spermatocytes_dev1$cluster)
-write.csv2(Spermatocytes_dev1, file = paste0(path,"/Spermatocytes_dev_scale.data.csv"))
-Spermatocytes_dev1 = read.csv2("./output/20180926/Spermatocytes_dev_scale.data.csv",header = T)
+write.csv(Spermatocytes_dev, file = paste0(path,"/Spermatocytes_dev_data_mean~.csv"))
+#Spermatocytes_dev = read.csv2("./output/20181030/Spermatocytes_dev.data_mean~.csv")
 # 6.5.4 generate heatmap =======
 SSCs_spermato_markers = read.csv("./output/20180918/SSCs_spermato_markers.csv",
                                  header = T,stringsAsFactors =F)
@@ -390,8 +378,6 @@ markers = MouseGenes(Spermatocytes,c(Spermatocytes_marker[1:30]))
 
 g1 <- DoHeatmap.1(Spermatocytes, marker_df = Spermatocytes_dev2, 
                   Top_n = 250, add.genes = markers,
-                  #col.low = "#FF00FF",col.mid = "#000000", col.high = "#FFFF00",
-                  col.low = "#FF00FF",col.mid = "#FFFFFF",col.high = "#FF0000",
                   group.order = time_series, 
                   ident.use = "Spermatocytes",
                   draw.line = TRUE, use.scaled = TRUE,
@@ -417,7 +403,7 @@ color_bar$time_points = factor(color_bar$time,levels = c("Spermatocytes\nMarkers
 color_bar$x <- 1:nrow(color_bar)
 head(color_bar)
 table(color_bar$time_points)
-write.csv2(color_bar,paste0(path,"/Fig_5_Spermatocytes_GOI.csv"))
+write.csv2(color_bar,paste0(path,"/Fig_5_Spermatocytes_GOI_mean~.csv"))
 
 color = c("#BF5B17","#00C094","#00B6EB","#A58AFF","#FB61D7","#F8766D","#C49A00")
 
@@ -425,11 +411,11 @@ g_Spermatocytes <- MakeCorlorBar(df = color_bar,
                                  cell_type = "Spermatocytes",color=color) +
         coord_flip() + scale_x_reverse()
 
-jpeg(paste0(path,"/5_Spermatocytes_dev_data_pct.1>0.1~.jpeg"), units="in", width=10, height=7,res=600)
+jpeg(paste0(path,"/5_Spermatocytes_dev_data_mean~.jpeg"), units="in", width=10, height=7,res=600)
 g1
 dev.off()
 
-jpeg(paste0(path,"/5_Spermatocytes_1.jpeg"), units="in", width=3, height=7,res=600)
+jpeg(paste0(path,"/5_Spermatocytes_mean~.jpeg"), units="in", width=3, height=7,res=600)
 g_Spermatocytes
 dev.off()
 #################################################################
@@ -682,3 +668,69 @@ dir.create(path, recursive = T)
 
 lname1 = load(file = "./data/SSCs_20180926.Rda");lname1
 write.csv2(SSCs@meta.data,paste0(path,"/meta_data.csv"))
+
+
+
+#################################################################
+#
+# the cell count numbers for PND18pre and PND18 including somatic cells
+#
+#################################################################
+
+lname1 = load(file = "./data/SSCs_20180926.Rda");lname1
+table(SSCs@meta.data$orig.ident)
+table(SSCs@ident)
+major_cells <- c("Spermatogonia","Early Spermatocytes","Spermatocytes",
+                 "Round Spermatids","Spermatids","Sertoli cells",
+                 "Endothelial & Hematopoietic cells", "Smooth muscle")
+counts <- table(as.vector(SSCs@ident), SSCs@meta.data$orig.ident)
+kable(counts) %>% kable_styling()
+major_cells = major_cells[1:5]
+time_series <- c("PND06","PND14","PND18",#"PND18pre",
+                 "PND25","PND30","Ad-depleteSp","Ad-Thy1")
+counts = counts[rev(major_cells),time_series]
+
+jpeg(paste0(path,"/1_B_bar_chart.jpeg"), units="in", width=10, height=7,
+     res=600)
+par(mfrow=c(1, 1), mar=c(5, 4, 4, 2))
+barplot(counts, main="Total numbers of germ cells vs. time-points",
+        xlab="Time points", ylab="Cell numbers",
+        col=singler.colors[8:4],
+        legend = rownames(counts),
+        args.legend = list(x = "topleft", bty = "n"))
+dev.off()
+
+#################################################################
+#
+# tSNE plot that is all grey dots EXCEPT for the PND18pre and PND18 samples in colored dots
+#
+#################################################################
+lname1 = load(file = "./data/SSCs_20180926.Rda");lname1
+SSCs <- SetAllIdent(SSCs, id = "orig.ident")
+color_scheme <- gg_colors(SSCs)
+color_scheme <- c("#d3d3d3","#d3d3d3","#d3d3d3","#d3d3d3",
+                  "#00BFC4", "#C77CFF","#d3d3d3","#d3d3d3")
+p <- TSNEPlot.1(object = SSCs,do.label = T, group.by = "orig.ident",
+           do.return = TRUE, no.legend = T,colors.use = color_scheme,
+           pt.size = 1,label.size = 5,label.repel = T)+
+        ggtitle("tSNE plot of all libraries")+
+        theme(text = element_text(size=20),
+              plot.title = element_text(hjust = 0.5, face = "bold"))
+
+jpeg(paste0(path,"/tSNE_PND18_and_pre.jpeg"), units="in", width=10, height=7,
+     res=600)
+p
+dev.off()
+
+PND18 <- SubsetData(SSCs, ident.use = c("PND18","PND18pre"))
+p1 <- TSNEPlot.1(object = PND18,do.label = T, group.by = "orig.ident",
+                do.return = TRUE, no.legend = T,colors.use = c("#00BFC4", "#C77CFF"),
+                pt.size = 1,label.size = 5,label.repel = T)+
+        ggtitle("tSNE plot of PND18 and PND18pre")+
+        theme(text = element_text(size=20),
+              plot.title = element_text(hjust = 0.5, face = "bold"))
+
+jpeg(paste0(path,"/tSNE_PND18_and_pre~.jpeg"), units="in", width=10, height=7,
+     res=600)
+p1
+dev.off()

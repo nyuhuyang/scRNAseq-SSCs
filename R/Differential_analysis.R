@@ -10,13 +10,15 @@ library(kableExtra)
 library(SingleR)
 library(reshape2)
 library(MAST)
-source("./R/Seurat_functions.R")
+source("../R/Seurat_functions.R")
+
+
 
 path <- paste("./output",gsub("-","",Sys.Date()),sep = "/")
 dir.create(path, recursive = T)
 # 4.1 load data & Rename ident, Compare DE across all major cell types=========================
 # 4.1.1 load data ==============
-lname1 = load(file = "./data/SSCs_20180825.Rda");lname1
+lname1 = load(file = "./data/SSCs_20181029_.Rda");lname1
 SSCs@meta.data$orig.ident = gsub("PND18pre","PND18",SSCs@meta.data$orig.ident)
 table(SSCs@meta.data$orig.ident)
 table(SSCs@ident)
@@ -74,9 +76,7 @@ Spermatid_Genes = Spermatid_Genes_to_Filter$`Completely Spermatid Gene List To R
 genes.use = rownames(SSCs_spermato@data); length(genes.use)
 table(Spermatid_Genes %in% genes.use)
 genes.use = genes.use[!(genes.use %in% Spermatid_Genes)]; length(genes.use)
-SSCs_spermato@raw.data = SSCs_spermato@raw.data[genes.use, ]
 SSCs_spermato@data = SSCs_spermato@data[genes.use, ]
-#SSCs_spermato@scale.data = SSCs_spermato@scale.data[genes.use, ]
 TSNEPlot.1(object = SSCs_spermato,do.label = T, group.by = "ident",
            do.return = TRUE, no.legend = T,colors.use = singler.colors[4:8],
            pt.size = 1,label.size = 5,label.repel = T)+
@@ -93,7 +93,7 @@ SSCs_spermato_markers <- FindAllMarkers.UMI(SSCs_spermato,test.use = "MAST")
 kable(SSCs_spermato_markers[1:20,]) %>% kable_styling()
 rownames(SSCs_spermato_markers) = NULL
 SSCs_spermato_markers <- SSCs_spermato_markers %>% select("gene", everything()) # Moving the last column to the start
-write.csv(SSCs_spermato_markers,"./output/20180918/SSCs_spermato_markers.csv")
+write.csv(SSCs_spermato_markers,"./output/20181030/SSCs_spermato_markers.csv")
 
 # 4.2.0. define pipeline ==============
 

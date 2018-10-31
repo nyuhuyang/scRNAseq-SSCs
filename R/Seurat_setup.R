@@ -43,10 +43,10 @@ SSCs <- Reduce(function(x, y) MergeSeurat(x, y, do.normalize = F), SSCs_Seurat)
 remove(SSCs_raw,SSCs_Seurat);GC()
 SSCs <- FilterCells(SSCs, subset.names = "nGene",
                     low.thresholds = 200,
-                    high.thresholds = Inf) %>%
-        NormalizeData() %>%
-        ScaleData(display.progress = FALSE) %>%
-        FindVariableGenes(do.plot = FALSE, display.progress = FALSE)
+                    high.thresholds = Inf) #%>%
+        #NormalizeData() %>%
+        #ScaleData(display.progress = FALSE) %>%
+        #FindVariableGenes(do.plot = FALSE, display.progress = FALSE)
 save(SSCs, file = "./data/SSCs_20180825.Rda")
 
 #======1.2 QC, pre-processing and normalizing the data=========================
@@ -76,7 +76,7 @@ SSCs <- AddMetaData(object = SSCs, metadata = percent.mito, col.name = "percent.
 
 g1 <- VlnPlot(object = SSCs, features.plot = c("nGene", "nUMI", "percent.mito"), nCol = 1,
              x.lab.rot = T, do.return = T)
-g1
+
 SSCs <- FilterCells(object = SSCs, subset.names = c("nGene","nUMI","percent.mito"),
                     low.thresholds = c(500,2000, -Inf), 
                     high.thresholds = c(8000,125000, 0.15))
@@ -111,8 +111,7 @@ TSNEPlot(object = SSCs, do.label = F, group.by = "orig.ident",
         theme(text = element_text(size=15),							
               plot.title = element_text(hjust = 0.5,size = 18, face = "bold")) 
 
-save(SSCs, file = "./data/SSCs_20180825.Rda")
-Iname = load("./data/SSCs_20180825.Rda")
+save(SSCs, file = "./data/SSCs_20181030.Rda")
 
 #======1.4 Add Cell-cycle score =========================
 # Read in a list of cell cycle markers, from Tirosh et al, 2015
@@ -155,15 +154,12 @@ remove(m,com);GC()
 #---------------------
 SSCs@data = readRDS("./data/Combat_data.Rda")
 SSCs@scale.data = NULL
-SSCs <- ScaleData(object = SSCs,#genes.use = SSCs@var.genes,
-                  model.use = "negbinom", do.par=T, do.center = T, do.scale = T,
-                  vars.to.regress = c("CC.Difference"),#"CC.Difference","percent.mito"--nogood,"nUMI"--nogood
-                  display.progress = T)
-SSCs@data =  readRDS("./data/SSCs_data.Rda")
+SSCs <- ScaleData(object = SSCs,
+                    model.use = "negbinom", do.center = T, do.scale = T,
+                  vars.to.regress = c("CC.Difference"),
+                  display.progress = T, do.par = T)
+#SSCs@data =  readRDS("./data/SSCs_data.Rda")
 
-gene.use <- rownames(SSCs@scale.data);length(gene.use)
-SSCs@data = SSCs@data[gene.use,]
-#save(SSCs, file = "./data/SSCs_20181001.Rda") #do.center = F, do.scale = T
 #======1.7 unsupervised clustering =========================
 SSCs <- RunPCA(object = SSCs, pc.genes = SSCs@var.genes, pcs.compute = 100, 
                do.print = TRUE, pcs.print = 1:5, genes.print = 5)
@@ -178,7 +174,9 @@ SSCs <- FindClusters(object = SSCs, reduction.type = "pca", dims.use = 1:30,
                      k.param = 30,force.recalc = T,
                      save.SNN = TRUE, n.start = 100, nn.eps = 0, print.output = FALSE)
 #SSCs@meta.data$orig.ident <- gsub("PND18pre","PND18",SSCs@meta.data$orig.ident)
-TSNEPlot.1(object = SSCs, do.label = T, group.by = "ident", 
+jpeg(paste0(path,"/tSNE_orig.jpeg"), units="in", width=10, height=7,
+     res=600)
+TSNEPlot.1(object = SSCs, do.label = T, group.by = "orig.ident", 
          do.return = TRUE, no.legend = T, 
          text.repel = T, label.repel = F,
         #colors.use = singler.colors,
@@ -186,5 +184,6 @@ TSNEPlot.1(object = SSCs, do.label = T, group.by = "ident",
         ggtitle("TSNEPlot, resolution = 0.8, k.param = 30")+
         theme(text = element_text(size=15),							
               plot.title = element_text(hjust = 0.5,size = 18, face = "bold")) 
+dev.off()
 SSCs <- StashIdent(object = SSCs, save.name = "res.0.8")
-save(SSCs, file = "./data/SSCs_20180825.Rda")
+save(SSCs, file = "./data/SSCs_20181030.Rda")

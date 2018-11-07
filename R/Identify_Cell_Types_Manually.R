@@ -154,37 +154,34 @@ SSC_labels_id$Spermatocytes = c(SSC_labels_id$Spermatocytes,
 # 3.5.2 Rename ident again ====
 
 #' rename ident for certain cells only
-#' One Perk, will double check the duplicated cell names
 #' @param object Seurat object
 #' @param new.ident.name one character
 #' @param cells.use a vector of cell names
 #' @export object Seurat object with new ident
 #' @example 
-# SSCs@ident = RenameIdent.2(object = SSCs, 
-#                            new.ident.name = "Smooth muscle",
-#                            cells.use = SSC_labels_id[["Smooth muscle"]])
-RenameIdent.2 <- function(object, new.ident.name, cells.use){
+#' for(i in 1:length(SSC_labels_id)){
+#'         SSCs <- RenameIdent.1(SSCs, new.ident.name = names(SSC_labels_id)[i],
+#'                               cells.use = SSC_labels_id[[i]])
+#' }
+RenameIdent.1 <- function (object, new.ident.name, cells.use) 
+{
+        new.levels <- old.levels <- levels(x = object@ident)
+        if (!(new.ident.name %in% old.levels)) {
+                new.levels <- c(new.levels, new.ident.name)
+        }
         
-        old.ident = object@ident
-        old.in.new = old.ident[names(old.ident) %in% cells.use] %>%
-                droplevels()
-        old.not.in.new = old.ident[!(names(old.ident) %in% cells.use)] %>%
-                droplevels()
-        old.levels = levels(old.in.new)
-        wrong.types = old.levels[!(old.levels %in% new.ident.name)]
-        old.in.new[old.in.new %in% wrong.types] = new.ident.name
-        new.ident.ids <- unlist(list(old.in.new, old.not.in.new)) # concatenate two factors
-        object@ident = factor(x = new.ident.ids, levels = levels(object@ident))
+        ident.vector <- as.character(x = object@ident)
+        names(x = ident.vector) <- names(object@ident)
+        ident.vector[cells.use] <- new.ident.name
+        object@ident <- factor(x = ident.vector, levels = new.levels)
         
         return(object)
 }
 
-new.types <- c("Spermatogonia")
-for(new.type in new.types) {
-        SSCs = RenameIdent.2(object = SSCs,
-                               new.ident.name = new.type,
-                               cells.use = SSC_labels_id[[new.type]])
-        }
+for(i in 1:length(SSC_labels_id)){
+ SSCs <- RenameIdent.1(SSCs, new.ident.name = names(SSC_labels_id)[i],
+                       cells.use = SSC_labels_id[[i]])
+}
 
 TSNEPlot.1(object = SSCs,do.label = T, group.by = "ident", 
            do.return = TRUE, no.legend = T, colors.use = singler.colors,

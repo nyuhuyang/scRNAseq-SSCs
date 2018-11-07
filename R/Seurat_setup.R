@@ -10,6 +10,8 @@ library(Matrix)
 library(sva)
 library(SingleR)
 source("../R/Seurat_functions.R")
+if(!dir.exists("output")) dir.create("output")
+if(!dir.exists("data")) dir.create("data")
 ########################################################################
 #
 #  1 Data preprocessing

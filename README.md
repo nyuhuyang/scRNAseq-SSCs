@@ -1,5 +1,7 @@
 # scRNAseq-SSCs
-scRNAseq analysis for Paula Cohen lab SSCs project
+Dynamic transcriptome profiles within spermatogonial and spermatocyte populations during postnatal testis maturation revealed by single-cell sequencing
+Kathryn J Grive, Yang Hu, Eileen Shu, Andrew Grimson, Olivier Elemento, Jennifer K Grenier, Paula E. Cohen
+https://www.biorxiv.org/content/early/2018/11/06/464149
 
 ## INTRODUCTION
 

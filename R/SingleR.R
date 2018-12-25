@@ -5,7 +5,8 @@ library(pheatmap)
 library(kableExtra)
 source("../R/Seurat_functions.R")
 source("../R/SingleR_functions.R")
-AverageExpression ()
+path <- paste0("./output/",gsub("-","",Sys.Date()),"/")
+if(!dir.exists(path)) dir.create(path, recursive = T)
 #====== 2.1 load data  ==========================================
 lname1 = load(file = "./data/SSCs_20180822.Rda");lname1
 lname2 = load(file='./data/GeneSets/Ref_GSE43717.RData');lname2

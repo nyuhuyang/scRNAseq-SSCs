@@ -12,6 +12,7 @@ library(SingleR)
 source("../R/Seurat_functions.R")
 if(!dir.exists("output")) dir.create("output")
 if(!dir.exists("data")) dir.create("data")
+
 ########################################################################
 #
 #  1 Data preprocessing
@@ -176,10 +177,10 @@ SSCs <- FindClusters(object = SSCs, reduction.type = "pca", dims.use = 1:30,
                      k.param = 30,force.recalc = T,
                      save.SNN = TRUE, n.start = 100, nn.eps = 0, print.output = FALSE)
 #SSCs@meta.data$orig.ident <- gsub("PND18pre","PND18",SSCs@meta.data$orig.ident)
-jpeg(paste0(path,"/tSNE_orig.jpeg"), units="in", width=10, height=7,
+jpeg(paste0(path,"tSNE_orig.jpeg"), units="in", width=10, height=7,
      res=600)
-TSNEPlot.1(object = SSCs, do.label = T, group.by = "orig.ident", 
-         do.return = TRUE, no.legend = T, 
+TSNEPlot.1(object = SSCs, do.label = F, group.by = "orig.ident", 
+         do.return = TRUE, no.legend = F, 
          text.repel = T, label.repel = F,
         #colors.use = singler.colors,
          pt.size = 1,label.size = 6 )+

@@ -73,7 +73,7 @@ de.num = 200,de.main.num = 300){
 }
 
 
-FineTune_Human <- function(x, main.type = FALSE){
+FineTune <- function(x, main.type = FALSE){
         # for both main types and sub-types
         x = gsub(" ","_",x)
         x = gsub("B-cells","B_cells",x)

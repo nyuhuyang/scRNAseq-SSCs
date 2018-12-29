@@ -10,9 +10,10 @@ library(tidyr)
 library(MAST)
 library(sva)
 library(kableExtra)
-source("./R/Seurat_functions.R")
-source("./R/SingleR_functions.R")
-
+source("../R/Seurat_functions.R")
+source("../R/SingleR_functions.R")
+path <- paste0("./output/",gsub("-","",Sys.Date()),"/")
+if(!dir.exists(path)) dir.create(path, recursive = T)
 # 5.1 load data ==============
 lname1 = load(file = "./data/SSCs_20180825.Rda");lname1
 SSCs@meta.data$orig.ident = gsub("PND18pre","PND18",SSCs@meta.data$orig.ident)
@@ -163,3 +164,32 @@ write.table(GSEA_cls,file= paste0(path,"/GSEA_exp.cls"), sep=" ")
 # delete the space before and after each row.
 gsea_report <- read.delim("~/Downloads/gsea_report_for_Spermatocytes_neg_1537120967457.txt", row.names=1)
 gsea_report %>% kable() %>% kable_styling()
+
+
+#=================================
+# 5.5 test GSEA among cell (super)clusters
+#=================================
+(load(file = "./data/SSCs_20180926.Rda"))
+SSCs@meta.data$Cell.Types = gsub(" ", "_",SSCs@meta.data$Cell.Types)
+SSCs <- SetAllIdent(SSCs, id = "Cell.Types")
+major_cells <- c("Spermatogonia","Early_Spermatocytes","Spermatocytes",
+                 "Round_Spermatids","Spermatids")
+object <- SubsetData(SSCs,ident.use = major_cells)
+PrepareGSEA(object, k = 1, continuous.label = major_cells)
+
+# Run GSEA and generate reports
+(gsea_path <- paste0("~/gsea_home/output/",tolower(format(Sys.Date(), "%b%d")), 
+                     "/Cell.Types1.c1.all.Gsea.1546051159332"))
+(pos.xls.path <- list.files(gsea_path,pattern="gsea_report_for_.*xls")[1])
+GSEA_output <- readr::read_delim(paste0(gsea_path,"/",pos.xls.path),"\t", 
+                                 escape_double = FALSE, trim_ws = TRUE)
+GSEA_output %>% .[-c(2,3,12)] %>% head(50) %>% kable() %>% kable_styling()
+
+(GSEA.plots <- sapply(GSEA_output$NAME[1:9], function(name) {
+        paste0("enplot_",name, "_([0-9]+)*\\.png$")}) %>%
+                sapply(function(x) list.files(path = gsea_path, pattern =x)) %>%
+                .[sapply(.,length)>0] %>% #Remove empty elements from list with character(0)
+                paste(gsea_path, ., sep = "/")) 
+CombPngs(GSEA.plots, ncol = 3)
+file.rename(paste0(path,list.files(path,pattern=paste0("GSEA.plots_CombPngs"))), 
+            paste0(path,"Cell.Types1.c1.all.Gsea.1546051159332",".jpeg"))

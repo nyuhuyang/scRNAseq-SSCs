@@ -25,12 +25,13 @@ if(!dir.exists("data")) dir.create("data")
 # cells, we do no additional filtering here
 
 # rename all "_" into "-" in sample names 
+df_samples <- readxl::read_excel("doc/20180530_sample_info.xlsx")
+colnames(df_samples) <- colnames(df_samples) %>% tolower
+(samples <- df_samples$sample)
+(conditions <- df_samples$conditions)
+
 SSCs_raw <- list()
 SSCs_Seurat <- list()
-samples <- c("PND06","PND14","PND18","PND18pre",
-             "PND25","PND30","Ad-depleteSp","Ad-Thy1")
-conditions <- c("first-wave","first-wave","first-wave","first-wave",
-                "first-wave","first-wave","Adault-SSCs","Adault-SSCs")
 for(i in 1:length(samples)){
         SSCs_raw[[i]] <- Read10X(data.dir = paste0("./data/",
                                                    samples[i],"/outs/filtered_gene_bc_matrices/mm10/"))

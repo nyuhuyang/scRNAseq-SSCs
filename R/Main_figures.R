@@ -545,12 +545,13 @@ Somatic_markers <- MouseGenes(SSCs,c("Col1a2","Acta2","Vcam1","Insl3","Laptm5",
                                      "Ofd1",
                                      "Xlr","Usp9y","Sox3","Eda",
                                      "Il2rg","Phex","Kdm5d","Npy","Gjb1")))
-(X_linked_genes_no <-  MouseGenes(SSCs, c("Xist","Ctrb1","Gjb1")))
+(X_linked_genes1 <-  MouseGenes(SSCs, c("Prdx4","Asb9","Pdk3","Taf7l")))
+(X_linked_genes2 <-  MouseGenes(SSCs, c("Atrx","Fmr1","Ddx3y","Xiap")))
 marker_order <- c(8,6,3,9,0,15,2,7,18,17,10,11,5,4,12,20,21,14,16,13,1,19)
 SSCs@ident <- factor(x = SSCs@ident, levels = rev(marker_order)) # Relevel object@ident
-#markers.to.plot <- c(GermCell_markers,Somatic_markers,Sertoli_markers)
+markers.to.plot <- c(GermCell_markers,Somatic_markers,Sertoli_markers,X_linked_genes2)
 markers.to.plot <- unique(c(X_linked_markers,X_linked_genes,Y_linked_genes,X_linked_genes_no))
-jpeg(paste0(path,"S2B_dotplot_XY_linked.jpeg"), units="in", width=10, height=7,
+jpeg(paste0(path,"S2B_dotplot_2.jpeg"), units="in", width=10, height=7,
      res=600)
 DotPlot(SSCs, genes.plot = rev(markers.to.plot),
         cols.use = c("blue","red"), x.lab.rot = T, plot.legend = T,
@@ -901,7 +902,13 @@ time_series <- c("PND06","PND14","PND18","PND25","PND30","adult")
 SSCs@ident <- factor(SSCs@ident, levels = time_series)
 table(SSCs@ident)
 
+Spermatid_Genes_to_Filter <- readxl::read_excel("./doc/Spermatid Genes to Filter.xlsx")
+Spermatid_Genes = Spermatid_Genes_to_Filter$`Completely Spermatid Gene List To Remove (Spermatid/Other UMI Ratio > 20; and GSEA and tSNEs)`
+genes.use = rownames(SSCs@data); length(genes.use)
+table(Spermatid_Genes %in% genes.use)
+
 markers = MouseGenes(SSCs,c("Prm1"))
+Spermatid_Genes = MouseGenes(SSCs,Spermatid_Genes)
 
 SplitSingleFeaturePlot(SSCs, 
                        select.plots = c(2,3,4,5,6,1),
@@ -912,21 +919,27 @@ SplitSingleFeaturePlot(SSCs,
 # a tSNE plot figure with multiple panels: 
 # each panel will have that same background of all cells from all libraries,
 # but the individual panels will show Prm1 expression in PND6, PND14, and so on.
-df_marker_time <- matrix(0L, nrow = nrow(SSCs@meta.data), ncol = length(time_series),
-                         dimnames = list(rownames(SSCs@meta.data), 
-                                         time_series))
-cells_use <- split(row.names(SSCs@meta.data), SSCs@meta.data$orig.ident)
-
-for(i in 1:length(time_series)){
-        df_marker_time[cells_use[[time_series[i]]], time_series[i]] = 
-                SSCs@data[markers, cells_use[[time_series[i]]]]
+for(markers in Spermatid_Genes){
+        df_marker_time <- matrix(0L, nrow = nrow(SSCs@meta.data), ncol = length(time_series),
+                                 dimnames = list(rownames(SSCs@meta.data), 
+                                                 time_series))
+        cells_use <- split(row.names(SSCs@meta.data), SSCs@meta.data$orig.ident)
+        
+        for(i in 1:length(time_series)){
+                df_marker_time[cells_use[[time_series[i]]], time_series[i]] = 
+                        SSCs@data[markers, cells_use[[time_series[i]]]]
+        }
+        #colnames(df_marker_time) %<>% paste(markers, sep = "_")
+        SSCs <- AddMetaData(object = SSCs, metadata = as.data.frame(df_marker_time))
+        
+        g <- lapply(colnames(df_marker_time), function(marker) {
+                SingleFeaturePlot.1(SSCs, feature = marker)})
+        jpeg(paste0(path,"SplitSingleFeaturePlot_",markers,".jpeg"), units="in", width=10, height=7,
+             res=600)
+        print(do.call(cowplot::plot_grid, c(g, align = "hv"))+
+                      ggtitle(markers)+
+                      theme(plot.title = element_text(hjust = 0.5,size = 25,
+                                                      face = "bold")))
+        dev.off()
+        print(paste(markers, "accomplished"))
 }
-colnames(df_marker_time) %<>% paste(markers, sep = "_")
-SSCs <- AddMetaData(object = SSCs, metadata = as.data.frame(df_marker_time))
-
-g <- lapply(colnames(df_marker_time), function(marker) {
-        SingleFeaturePlot.1(SSCs, feature = marker)})
-jpeg(paste0(path,"SplitSingleFeaturePlot_",markers,".jpeg"), units="in", width=10, height=7,
-     res=600)
-print(do.call(cowplot::plot_grid, c(g, align = "hv")))
-dev.off()

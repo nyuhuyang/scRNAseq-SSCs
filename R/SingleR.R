@@ -96,12 +96,17 @@ prop.table(x = table(singler$singler[[1]]$SingleR.single.main$labels,
 table(singler$meta.data$orig.ident) %>% t() %>% kable() %>% kable_styling()
 
 #====== 2.5 Rename ident ==========================================
-table(names(SSCs@ident) == rownames(singler$singler[[1]]$SingleR.single.main$labels))
-
-ident.use <- as.factor(as.character(singler$singler[[1]]$SingleR.single.main$labels))
-names(ident.use) = rownames(singler$singler[[1]]$SingleR.single.main$labels)
-SSCs@ident <- ident.use
-
+singlerDF = data.frame("singler1sub"=singler$singler[[1]]$SingleR.single$labels,
+                       "singler1main"=singler$singler[[1]]$SingleR.single.main$labels,
+                       row.names = paste0(rownames(singler$singler[[1]]$SingleR.single$labels),
+                                          "-1"))
+singlerDF = singlerDF[object@cell.names,]
+table(rownames(singlerDF) %in% SSCs@cell.names)
+apply(singlerDF,2,function(x) length(unique(x)))
+#ident.DF[is.na(ident.DF)] <- "unknown"
+SSCs <- AddMetaData(object = SSCs,
+                      metadata = singlerDF)
+SSCs <- SetAllIdent(object = SSCs, id = "singler1main")
 TSNEPlot.1(object = SSCs,do.label = T, group.by = "ident", 
          do.return = TRUE, no.legend = T,colors.use = singler.colors,
          pt.size = 1,label.size = 5,label.repel = T,force=25)+

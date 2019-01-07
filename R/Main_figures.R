@@ -777,7 +777,7 @@ SSCs@meta.data$orig.ident = gsub("PND18pre","PND18",SSCs@meta.data$orig.ident)
 SSCs@meta.data$orig.ident = gsub("Ad-depleteSp","adult",SSCs@meta.data$orig.ident)
 SSCs@meta.data$orig.ident = gsub("Ad-Thy1","adult",SSCs@meta.data$orig.ident)
 SSCs@meta.data$Cell.Types = gsub("Endothelial & Hematopoietic cells",
-                                 "Endothelial &\n Hematopoietic cells",SSCs@meta.data$Cell.Types)
+                                 "Endothelial &\nHematopoietic cells",SSCs@meta.data$Cell.Types)
 
 SSCs <- SetAllIdent(object = SSCs, id = 'orig.ident')
 time_series <- c("PND06","PND14","PND18","PND25","PND30","adult")
@@ -787,19 +787,25 @@ table(SSCs@ident)
 SSCs_markes <- FindAllMarkers.UMI(SSCs,only.pos = T)
 write.csv(SSCs_markes,paste0(path,"SSCs_markes.csv"))
 SSCs_markes = read.csv(paste0("./output/20181207/SSCs_markes.csv"))
-(major_cells = unique(SSCs_markes$cluster))
+(time_series = unique(SSCs_markes$cluster))
 
-
+Spermatid_Genes_to_Filter <- readxl::read_excel("./doc/Spermatid Genes to Filter.xlsx")
+Spermatid_Genes = Spermatid_Genes_to_Filter$`Completely Spermatid Gene List To Remove (Spermatid/Other UMI Ratio > 20; and GSEA and tSNEs)`
+table(SSCs_markes$gene %in% Spermatid_Genes)
+Spermatid_markes = SSCs_markes[(SSCs_markes$gene %in% Spermatid_Genes),]
 #====== split SSCs object and re-merge ==========================================
 SSCs_list <- SplitSeurat(SSCs, split.by = "orig.ident")
-SSCs_list[[length(SSCs_list)]] = NULL
+major_cells <- c("Spermatogonia","Early Spermatocytes","Spermatocytes",
+                 "Round Spermatids","Spermatids","Sertoli cells",
+                 "Endothelial &\nHematopoietic cells", "Smooth muscle")
 #split by cell types and merge
 for(i in 1:(length(SSCs_list))){
         SSCs_list[[i]] <- split(row.names(SSCs_list[[i]]@meta.data), 
                                 SSCs_list[[i]]@meta.data$Cell.Types) %>%
-                .[lapply(., length)>1] %>% # Remove empty(and 1) elements from list. Seurat with 1 cells will convert matrix to numeric
-                lapply(function(cells_use) SubsetData(SSCs_list[[i]], cells_use)) %>%
-                Reduce(MergeSeurat,.) 
+            .[lapply(., length)>1] %>% # Remove empty(and 1) elements from list. Seurat with 1 cells will convert matrix to numeric
+            .[major_cells[major_cells %in% names(.)]] %>% # re-order list
+            lapply(function(cells_use) SubsetData(SSCs_list[[i]], cells_use)) %>%
+            Reduce(MergeSeurat,.) 
         print(paste0(i,":", length(SSCs_list)," completed"))
 }
 
@@ -808,19 +814,20 @@ new_SSCs <- ScaleData(new_SSCs)
 new_SSCs <- SetAllIdent(object = new_SSCs, id = 'orig.ident')
 new_SSCs@ident <- factor(new_SSCs@ident, levels = time_series)
 table(new_SSCs@ident)
-g1 <- DoHeatmap.1(SSCs, SSCs_markes, 
-                  Top_n = 30, 
-                  group.order = major_cells, 
-                  ident.use = "each libraries",
-                  draw.line = TRUE, cex.row = 3,#cex.row = 6,
-                  group.label.rot = T,remove.key =F, title.size = 12)
+
+g1 <- DoHeatmap(object = new_SSCs, genes.use = Spermatid_markes$gene, 
+                     slim.col.label = T,
+                     group.order = time_series, cex.row = 6,
+                     group.label.rot = T,remove.key = F, rotate.key = T,
+                     title = paste("Expression heatmap of spermatid-filtered gene"))+ 
+        theme(plot.title = element_text(size=12))
 
 jpeg(paste0(path,"comprehensive_heatmap~.jpeg"), units="in", width=10, height=7,
      res=600)
 g1+ theme(strip.text.x = element_text(margin=margin(t = 30, r = 0, b = 0, l = 0)))
 dev.off()
 
-MakeCorlorBar(new_SSCs, SSCs_markes)
+MakeCorlorBar(new_SSCs, Spermatid_markes)
 new_SSCs = SetAllIdent(new_SSCs, id = "Cell.Types")
 
 
@@ -877,8 +884,9 @@ MakeHCorlorBar <- function(object, cluster = "PND06", remove.legend = T,
                 return(g)
         }
 }
-for(major_cell in major_cells) {
-        MakeHCorlorBar(object = SSCs, cluster = major_cell, split.by = "Cell.Types",
+
+for(time_serie in time_series) {
+        MakeHCorlorBar(object = new_SSCs, cluster = time_serie, split.by = "Cell.Types",
                        remove.legend = F)     
 }
 
@@ -894,8 +902,6 @@ for(major_cell in major_cells) {
 (load(file = "./data/SSCs_20180926.Rda"))
 SSCs@meta.data$orig.ident = gsub("PND18pre","PND18",SSCs@meta.data$orig.ident)
 SSCs@meta.data$orig.ident = gsub("Ad-depleteSp|Ad-Thy1","adult",SSCs@meta.data$orig.ident)
-SSCs@meta.data$Cell.Types = gsub("Endothelial & Hematopoietic cells",
-                                 "Endothelial &\n Hematopoietic cells",SSCs@meta.data$Cell.Types)
 
 SSCs <- SetAllIdent(object = SSCs, id = 'orig.ident')
 time_series <- c("PND06","PND14","PND18","PND25","PND30","adult")
@@ -913,10 +919,10 @@ Spermatid_Genes = MouseGenes(SSCs,Spermatid_Genes)
 SplitSingleFeaturePlot(SSCs, 
                        select.plots = c(2,3,4,5,6,1),
                        group.by = "ident",split.by = "orig.ident",
-                       no.legend = T,label.size=3,do.print =T,markers = markers,
-                       threshold = 0.5)
+                       no.legend = T,label.size=3,do.print =T,markers = Spermatid_Genes,
+                       threshold = 0.5,x.lim = c(-60,60), y.lim = c(-60,60))
 
-# a tSNE plot figure with multiple panels: 
+# a tSNE plot figure with multiple panels:
 # each panel will have that same background of all cells from all libraries,
 # but the individual panels will show Prm1 expression in PND6, PND14, and so on.
 for(markers in Spermatid_Genes){
@@ -928,12 +934,16 @@ for(markers in Spermatid_Genes){
         for(i in 1:length(time_series)){
                 df_marker_time[cells_use[[time_series[i]]], time_series[i]] = 
                         SSCs@data[markers, cells_use[[time_series[i]]]]
+                zero_id <- df_marker_time[cells_use[[time_series[i]]], time_series[i]] == 0
+                df_marker_time[names(which(zero_id)), time_series[i]] = 0.01
         }
         #colnames(df_marker_time) %<>% paste(markers, sep = "_")
         SSCs <- AddMetaData(object = SSCs, metadata = as.data.frame(df_marker_time))
         
         g <- lapply(colnames(df_marker_time), function(marker) {
-                SingleFeaturePlot.1(SSCs, feature = marker)})
+                SingleFeaturePlot.1(SSCs, feature = marker, 
+                                    gradient.use = c("antiquewhite1", "red4"),
+                                    threshold= 0.001)})
         jpeg(paste0(path,"SplitSingleFeaturePlot_",markers,".jpeg"), units="in", width=10, height=7,
              res=600)
         print(do.call(cowplot::plot_grid, c(g, align = "hv"))+

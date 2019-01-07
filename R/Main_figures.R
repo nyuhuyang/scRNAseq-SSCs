@@ -919,7 +919,11 @@ Spermatid_Genes = MouseGenes(SSCs,Spermatid_Genes)
 SplitSingleFeaturePlot(SSCs, 
                        select.plots = c(2,3,4,5,6,1),
                        group.by = "ident",split.by = "orig.ident",
+<<<<<<< HEAD
                        no.legend = T,label.size=3,do.print =T,markers = Spermatid_Genes,
+=======
+                       no.legend = T,label.size=3,do.print =T,markers = markers,
+>>>>>>> 324e09c47bc7a593d5bfd597ce1daa67081e063b
                        threshold = 0.5,x.lim = c(-60,60), y.lim = c(-60,60))
 
 # a tSNE plot figure with multiple panels:

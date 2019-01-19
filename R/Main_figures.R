@@ -98,7 +98,7 @@ SSCs_spermato_markers = read.csv("./output/20181030/SSCs_spermato_markers.csv",
                                  header = T,stringsAsFactors =F)
 SSCs_spermato_markers %>% head(20) %>% kable() %>% kable_styling()
 top <-  SSCs_spermato_markers %>% group_by(cluster) %>% top_n(250, avg_logFC)
-write.csv2(top[!duplicated(top$gene),],paste0(path,"Fig_3_five_germ_cell_types.csv"))
+write.csv(top[!duplicated(top$gene),],paste0(path,"Fig_3_five_germ_cell_types.csv"))
 g1 <- DoHeatmap.1(SSCs_spermato, SSCs_spermato_markers, 
                   Top_n = 250, 
                   col.low = "#0000FF",col.mid = "#FFFFFF",col.high = "#FF0000",
@@ -147,7 +147,7 @@ table(b_color_bar[b_color_bar$major_cells == "Spermatocytes","time_points"])
 table(b_color_bar$time_points)
 
 color = c("#53B400","#00C094","#00B6EB","#A58AFF","#FB61D7","#F8766D","#C49A00")
-MakeCorlorBar <- function(df, cell_type, color =NULL, remove.legend =F){
+MakeCorlorBar.1 <- function(df, cell_type, color =NULL, remove.legend =F){
         df = df[(df$major_cells %in% cell_type),]
         g <- ggplot(data = df, aes(x, major_cells, fill = time_points)) +
                 geom_tile()+
@@ -182,17 +182,17 @@ color_scheme <- function(color,names){
 
 show_col(hue_pal()(7))
 table(b_color_bar[b_color_bar$major_cells == "Spermatids","time_points"])
-g_legend <- MakeCorlorBar(df = b_color_bar, cell_type = "Spermatogonia",
+g_legend <- MakeCorlorBar.1(df = b_color_bar, cell_type = "Spermatogonia",
                           remove.legend = F, color = color)
-g_Spermatogonia <- MakeCorlorBar(df = b_color_bar, cell_type = "Spermatogonia",
+g_Spermatogonia <- MakeCorlorBar.1(df = b_color_bar, cell_type = "Spermatogonia",
                                  color = color)
-g_Early_Spermatocytes <- MakeCorlorBar(df = b_color_bar, cell_type = "Early_Spermatocytes",
+g_Early_Spermatocytes <- MakeCorlorBar.1(df = b_color_bar, cell_type = "Early_Spermatocytes",
                                  color = color)
-g_Spermatocytes <- MakeCorlorBar(df = b_color_bar, cell_type = "Spermatocytes",
+g_Spermatocytes <- MakeCorlorBar.1(df = b_color_bar, cell_type = "Spermatocytes",
                                        color = color)
-g_Round_Spermatids <- MakeCorlorBar(df = b_color_bar, cell_type = "Round_Spermatids",
+g_Round_Spermatids <- MakeCorlorBar.1(df = b_color_bar, cell_type = "Round_Spermatids",
                               color = color)
-g_Spermatids <- MakeCorlorBar(df = b_color_bar, cell_type = "Spermatids",
+g_Spermatids <- MakeCorlorBar.1(df = b_color_bar, cell_type = "Spermatids",
                                  color = color)
 library(ggpmisc)
 library(gridExtra)
@@ -319,10 +319,10 @@ color_bar$time_points = factor(color_bar$time,levels = c("Spermatogonia\nMarkers
                                                          time_series))
 color_bar$x <- 1:nrow(color_bar)
 head(color_bar)
-write.csv2(color_bar,paste0(path,"Fig_4_spermatogonia_GOI_mean~.csv"))
+write.csv(color_bar,paste0(path,"Fig_4_spermatogonia_GOI_mean~.csv"))
 color = c("#386CB0","#53B400","#00C094","#A58AFF","#F8766D")#,"#FB61D7","#F8766D","#C49A00")
 
-g_Spermatogonia <- MakeCorlorBar(df = color_bar, 
+g_Spermatogonia <- MakeCorlorBar.1(df = color_bar, 
                                  cell_type = "Spermatogonia",color=color) +
                         coord_flip() + scale_x_reverse()
 
@@ -404,11 +404,11 @@ color_bar$time_points = factor(color_bar$time,levels = c("Spermatocytes\nMarkers
 color_bar$x <- 1:nrow(color_bar)
 head(color_bar)
 table(color_bar$time_points)
-write.csv2(color_bar,paste0(path,"Fig_5_Spermatocytes_GOI_mean~.csv"))
+write.csv(color_bar,paste0(path,"Fig_5_Spermatocytes_GOI_mean~.csv"))
 
 color = c("#BF5B17","#00C094","#00B6EB","#A58AFF","#FB61D7","#F8766D","#C49A00")
 
-g_Spermatocytes <- MakeCorlorBar(df = color_bar, 
+g_Spermatocytes <- MakeCorlorBar.1(df = color_bar, 
                                  cell_type = "Spermatocytes",color=color) +
         coord_flip() + scale_x_reverse()
 
@@ -511,7 +511,7 @@ dev.off()
 #
 #################################################################
 (load(file = "./data/SSCs_20180926.Rda"))
-SSCs <- SetAllIdent.1(object = SSCs, id = 'res.0.8')
+SSCs <- SetAllIdent(object = SSCs, id = 'Cell.Types')
 jpeg(paste0(path,"S2A_tSNE.jpeg"), units="in", width=10, height=7,
      res=600)
 TSNEPlot.1(object = SSCs,do.label = T, group.by = "ident",
@@ -531,9 +531,9 @@ GermCell_markers <- MouseGenes(SSCs,c("Gfra1","Zbtb16","Sall4","Dmrt1","Dazl","K
                                       "Id4","Sycp3","Mtl5","Nxt1","Shcbp1l","Aurka","Lyzl1",
                                       "Acrv1","Hemgn","Txndc8","Tssk6","Oaz3","Prm2"))
 Somatic_markers <- MouseGenes(SSCs,c("Col1a2","Acta2","Vcam1","Insl3","Laptm5",
-                                     "Hbb-bt","Ptgds"))
-(Sertoli_markers <- MouseGenes(SSCs,c("Wt1","Mro","Sox9","Amh","Dhh","Cst9")))#,"Rhox5",
-                                     #"Fshr")))
+                                     "Hbb-bt"))
+(Sertoli_markers <- MouseGenes(SSCs,c("Ptgds","Wt1","Mro","Sox9","Amh","Dhh","Cst9",
+                                      "Rhox5","FSHR","Gata1","Ar","LAMA5","Cdkn1b","CLU")))
 (X_linked_markers <- MouseGenes(SSCs, c("Prdx4","Asb9","Smpx","Pdk3","Taf7l",
                                         "Usp26","Rpgr")))
 (X_linked_genes <-  MouseGenes(SSCs, c("Atrx","Fmr1","Xiap","Flna","Dmd",
@@ -551,9 +551,9 @@ marker_order <- c(8,6,3,9,0,15,2,7,18,17,10,11,5,4,12,20,21,14,16,13,1,19)
 SSCs@ident <- factor(x = SSCs@ident, levels = rev(marker_order)) # Relevel object@ident
 markers.to.plot <- c(GermCell_markers,Somatic_markers,Sertoli_markers,X_linked_genes2)
 markers.to.plot <- unique(c(X_linked_markers,X_linked_genes,Y_linked_genes,X_linked_genes_no))
-jpeg(paste0(path,"S2B_dotplot_2.jpeg"), units="in", width=10, height=7,
+jpeg(paste0(path,"S2B_Sertoli_markers~.jpeg"), units="in", width=10, height=7,
      res=600)
-DotPlot(SSCs, genes.plot = rev(markers.to.plot),
+DotPlot(SSCs, genes.plot = rev(Sertoli_markers),
         cols.use = c("blue","red"), x.lab.rot = T, plot.legend = T,
         dot.scale = 8, do.return = T)
 dev.off()
@@ -689,7 +689,7 @@ path <- paste("./output",gsub("-","",Sys.Date()),sep = "/")
 dir.create(path, recursive = T)
 
 (load(file = "./data/SSCs_20180926.Rda"))
-write.csv2(SSCs@meta.data,paste0(path,"meta_data.csv"))
+write.csv(SSCs@meta.data,paste0(path,"meta_data.csv"))
 
 
 
@@ -771,7 +771,7 @@ length(singler_colors1)
 SSCs@meta.data[,"Cell.Types"] %>% unique %>% length
 SSCs <- AddMetaColor(object = SSCs, label= "Cell.Types", colors = singler_colors1[1:42])
 TSNEPlot.1(SSCs, colors.use = ExtractMetaColor(SSCs),do.label = T)
-
+SSCs <- SubsetData(SSCs, ident.remove = "Spermatids")
 #==========
 SSCs@meta.data$orig.ident = gsub("PND18pre","PND18",SSCs@meta.data$orig.ident)
 SSCs@meta.data$orig.ident = gsub("Ad-depleteSp","adult",SSCs@meta.data$orig.ident)
@@ -784,8 +784,8 @@ time_series <- c("PND06","PND14","PND18","PND25","PND30","adult")
 SSCs@ident <- factor(SSCs@ident, levels = time_series)
 table(SSCs@ident)
 
-SSCs_markes <- FindAllMarkers.UMI(SSCs,only.pos = T)
-write.csv(SSCs_markes,paste0(path,"SSCs_markes.csv"))
+#SSCs_markes <- FindAllMarkers.UMI(SSCs,only.pos = T)
+#write.csv(SSCs_markes,paste0(path,"SSCs_markes.csv"))
 SSCs_markes = read.csv(paste0("./output/20181207/SSCs_markes.csv"))
 (time_series = unique(SSCs_markes$cluster))
 
@@ -796,8 +796,9 @@ Spermatid_markes = SSCs_markes[(SSCs_markes$gene %in% Spermatid_Genes),]
 #====== split SSCs object and re-merge ==========================================
 SSCs_list <- SplitSeurat(SSCs, split.by = "orig.ident")
 major_cells <- c("Spermatogonia","Early Spermatocytes","Spermatocytes",
-                 "Round Spermatids","Spermatids","Sertoli cells",
-                 "Endothelial &\nHematopoietic cells", "Smooth muscle")
+                 "Round Spermatids",
+                 #"Spermatids",
+                 "Sertoli cells","Endothelial &\nHematopoietic cells", "Smooth muscle")
 #split by cell types and merge
 for(i in 1:(length(SSCs_list))){
         SSCs_list[[i]] <- split(row.names(SSCs_list[[i]]@meta.data), 
@@ -919,11 +920,7 @@ Spermatid_Genes = MouseGenes(SSCs,Spermatid_Genes)
 SplitSingleFeaturePlot(SSCs, 
                        select.plots = c(2,3,4,5,6,1),
                        group.by = "ident",split.by = "orig.ident",
-<<<<<<< HEAD
                        no.legend = T,label.size=3,do.print =T,markers = Spermatid_Genes,
-=======
-                       no.legend = T,label.size=3,do.print =T,markers = markers,
->>>>>>> 324e09c47bc7a593d5bfd597ce1daa67081e063b
                        threshold = 0.5,x.lim = c(-60,60), y.lim = c(-60,60))
 
 # a tSNE plot figure with multiple panels:

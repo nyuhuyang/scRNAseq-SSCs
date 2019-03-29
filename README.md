@@ -1,7 +1,7 @@
 # scRNAseq-SSCs
 Dynamic transcriptome profiles within spermatogonial and spermatocyte populations during postnatal testis maturation revealed by single-cell sequencing
 Kathryn J Grive, Yang Hu, Eileen Shu, Andrew Grimson, Olivier Elemento, Jennifer K Grenier, Paula E. Cohen
-https://www.biorxiv.org/content/early/2018/11/06/464149
+https://journals.plos.org/plosgenetics/article?id=10.1371/journal.pgen.1007810
 
 ## INTRODUCTION
 

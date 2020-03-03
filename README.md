@@ -28,7 +28,7 @@ Move Cell Ranger analysis results into **_data_** folder.
 <a href="https://github.com/nyuhuyang/scRNAseq-SSCs/blob/master/R/Seurat_setup.R">Seurat_setup.R</a><br />
 The Cells with less than 500 genes or 2000 UMIs or more than 15% of mitochondria genes were excluded from the analysis. Gene expression raw counts were normalized following a global-scaling normalization method with a scale factor of 10,000 and a log 2 transformation, using the Seurat NormalizeData function. The top 4000 highly variable genes were selected using the expression and dispersion (variance/mean) of genes. Combat removed the batch effect. Seurat regressed the difference between the G2M and S phase, then followed by principal component analysis (PCA). The most significant principal components (1-30) were used for unsupervised clustering with 0.8 resolution and t-Distributed Stochastic Neighbor Embedding (tSNE). 
 
-![](ttps://github.com/nyuhuyang/scRNAseq-SSCs/blob/master/Figs/TSNEPlot_PND06_PND14_PND18_PND18pre_PND25_PND30_Ad-depleteSp_Ad-Thy1_res.0.8.jpeg)
+![](https://github.com/nyuhuyang/scRNAseq-SSCs/blob/master/Figs/TSNEPlot_PND06_PND14_PND18_PND18pre_PND25_PND30_Ad-depleteSp_Ad-Thy1_res.0.8.jpeg)
 After running this script, a `SSCs_(date).Rda` file will be generated inside **_data_** folder.
 
 ### 2. SingleR.R (optional)
@@ -91,6 +91,7 @@ UMI.1 is average nUMI of the current cluster.<br />
 UMI.2 is average nUMI of rest of clusters.<br />
 cluster : either cell type or corresponding cluster.
 
+![](https://github.com/nyuhuyang/scRNAseq-SSCs/blob/master/Figs/Doheatmap_top10_object_Cell.Types.jpeg)
 ### 5. GSEA.R
 <a href="https://github.com/nyuhuyang/scRNAseq-SSCs/blob/master/R/GSEA.R">GSEA.R</a></li>
 After running this script, a expression txt and label cls file will be generated inside **_output_** folder, for Gene Set Enrichment Analysis.

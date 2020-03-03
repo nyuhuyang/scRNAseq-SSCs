@@ -43,7 +43,7 @@ A dataset of 358 mouse RNA-seq samples annotated to 28 cell types. This dataset 
 
 GSE43717: Cellular source and mechanisms of high transcriptome complexity in the mammalian testis (RNA-Seq cells). This dataset contains five mouse testis cell types including Sertoli cells, Spermatogonia, Spermatocytes, Spermatids, and Spermatozoa.
 
-![](https://github.com/nyuhuyang/scRNAseq-SSCs/blob/master/Figs/TSNEPlot_PND06_PND14_PND18_PND18pre_PND25_PND30_Ad-depleteSp_Ad-Thy1_Cell.Types_PCA_seurat2.jpeg)
+![](https://github.com/nyuhuyang/scRNAseq-SSCs/blob/master/Figs/Cell_types.jpeg)
 After running this script, a `singler_labels.RData` file will be generated inside **_output_** folder.
 
 ### 3. Identify_Cell_Types_Manually.R

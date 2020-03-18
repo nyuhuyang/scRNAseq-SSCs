@@ -31,23 +31,7 @@ The Cells with less than 500 genes or 2000 UMIs or more than 15% of mitochondria
 ![](https://github.com/nyuhuyang/scRNAseq-SSCs/blob/master/Figs/TSNEPlot_PND06_PND14_PND18_PND18pre_PND25_PND30_Ad-depleteSp_Ad-Thy1_res.0.8.jpeg)
 After running this script, a `SSCs_(date).Rda` file will be generated inside **_data_** folder.
 
-### 2. SingleR.R (optional)
-<a href="https://github.com/nyuhuyang/scRNAseq-SSCs/blob/master/R/SingleR.R">SingleR.R</a><br />
-Cell types were identified by SingleR (Single-cell Recognition) package. SingleR is a novel computational method for unbiased cell type recognition of scRNA-seq. SingleR leverages reference transcriptomic datasets of pure cell types to infer the cell of origin of each of the single cells independently.
-
-We processed and annotated three reference mouse datasets:
-
-Immunological Genome Project (ImmGen): a collection of 830 microarray samples, which we classified to 20 main cell types and further annotated to 253 subtypes.
-
-A dataset of 358 mouse RNA-seq samples annotated to 28 cell types. This dataset was collected, processed and shared, courtesy of Bérénice Benayoun. This data set is especially useful for brain-related samples.
-
-GSE43717: Cellular source and mechanisms of high transcriptome complexity in the mammalian testis (RNA-Seq cells). This dataset contains five mouse testis cell types including Sertoli cells, Spermatogonia, Spermatocytes, Spermatids, and Spermatozoa.
-
-![](https://github.com/nyuhuyang/scRNAseq-SSCs/blob/master/Figs/cell_tpes.PNG)
-![](https://github.com/nyuhuyang/scRNAseq-SSCs/blob/master/Figs/journal.pgen.1007810.g001.PNG)
-After running this script, a `singler_labels.RData` file will be generated inside **_output_** folder.
-
-### 3. Identify_Cell_Types_Manually.R
+### 2. Identify_Cell_Types_Manually.R
 <a href="https://github.com/nyuhuyang/scRNAseq-SSCs/blob/master/R/Identify_Cell_Types_Manually.R">Identify_Cell_Types_Manually.R</a><br />
 All clusters are tested against marker genes.
 All cell types are predicted by at least two marker genes.
@@ -64,6 +48,22 @@ Spermatids were identified by Txndc8, Tssk6, Oaz3, Prm1, and Prm2.<br />
 ![](https://github.com/nyuhuyang/scRNAseq-SSCs/blob/master/Figs/Featureplot~.jpeg)
 ![](https://github.com/nyuhuyang/scRNAseq-SSCs/blob/master/Figs/Featureplot.jpeg)
 ![](https://github.com/nyuhuyang/scRNAseq-SSCs/blob/master/Figs/dotplot.jpeg)
+
+### 3. SingleR.R (optional)
+<a href="https://github.com/nyuhuyang/scRNAseq-SSCs/blob/master/R/SingleR.R">SingleR.R</a><br />
+Cell types were identified by SingleR (Single-cell Recognition) package. SingleR is a novel computational method for unbiased cell type recognition of scRNA-seq. SingleR leverages reference transcriptomic datasets of pure cell types to infer the cell of origin of each of the single cells independently.
+
+We processed and annotated three reference mouse datasets:
+
+Immunological Genome Project (ImmGen): a collection of 830 microarray samples, which we classified to 20 main cell types and further annotated to 253 subtypes.
+
+A dataset of 358 mouse RNA-seq samples annotated to 28 cell types. This dataset was collected, processed and shared, courtesy of Bérénice Benayoun. This data set is especially useful for brain-related samples.
+
+GSE43717: Cellular source and mechanisms of high transcriptome complexity in the mammalian testis (RNA-Seq cells). This dataset contains five mouse testis cell types including Sertoli cells, Spermatogonia, Spermatocytes, Spermatids, and Spermatozoa.
+
+![](https://github.com/nyuhuyang/scRNAseq-SSCs/blob/master/Figs/cell_tpes.PNG)
+![](https://github.com/nyuhuyang/scRNAseq-SSCs/blob/master/Figs/journal.pgen.1007810.g001.PNG)
+After running this script, a `singler_labels.RData` file will be generated inside **_output_** folder.
 
 ### 4. Differential_analysis.R
 <a href="https://github.com/nyuhuyang/scRNAseq-SSCs/blob/master/R/Differential_analysis.R">Differential_analysis.R</a><br />

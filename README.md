@@ -46,7 +46,6 @@ Round Spermatids were identified by Lyzl1, Acrv1 and Hemgn.<br />
 Spermatids were identified by Txndc8, Tssk6, Oaz3, Prm1, and Prm2.<br />
 
 ![](https://github.com/nyuhuyang/scRNAseq-SSCs/blob/master/Figs/Featureplot~.jpeg)
-![](https://github.com/nyuhuyang/scRNAseq-SSCs/blob/master/Figs/Featureplot.jpeg)
 ![](https://github.com/nyuhuyang/scRNAseq-SSCs/blob/master/Figs/dotplot.jpeg)
 
 ### 3. SingleR.R (optional)

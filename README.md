@@ -97,5 +97,5 @@ cluster : either cell type or corresponding cluster.
 After running this script, a expression txt and label cls file will be generated inside **_output_** folder, for Gene Set Enrichment Analysis.
 
 ### 6. Main_figures.R
-<a href="https://github.com/nyuhuyang/scRNAseq-SSCs/blob/master/R/Main_figures.R">GSEA.R</a></li>
+<a href="https://github.com/nyuhuyang/scRNAseq-SSCs/blob/master/R/Main_figures.R">Main_figures.R</a></li>
 Source code to produce all figures.
